@@ -95,15 +95,17 @@ Browser: sqlite-wasm loads the file in memory
 
 ```
 scry/
-  scry.py            # CLI (scan, serve), parser, tags, build rules, server
-  web/index.html     # single page: index view and timeline view
-  vendor/            # sqlite-wasm .mjs and .wasm, pinned 3.54.1-build1
+  scry.py            # CLI (serve, scan, bundle), parser, tags, build rules, server
+  page.html          # the single page: library view and game view
   requirements.txt   # sc2reader (pinned)
-  Makefile           # help (default), vendor, scan, run
-  plan.md
+  Makefile           # help (default), deps, run, scan, bundle
+  dist/scry.py       # one-file build (make bundle), page embedded
+  .scry/             # created at run time: scry.sqlite and vendor/ (sqlite-wasm, fetched once)
+  plan.md, notes.md
 ```
 
-Open point: keep all Python in `scry.py`, or split the parser out if it grows past about 800 lines.
+Decided: all Python stays in one file. `page.html` is embedded by `make bundle`, so the shipped tool is one file.
+The sqlite-wasm files are not shipped. The first run downloads them and checks a pinned sha512.
 
 ### CLI
 
