@@ -659,7 +659,7 @@ function renderGame() {
   const g = d.g, note = noteFor(g.id, g.fingerprint);
   note.fp = g.fingerprint || note.fp;
   const nameOf = pid => (d.players.find(p => p.pid === pid) || {}).name || '?';
-  box.append(h('div', { class: 'row' }, h('button', { on: { click: () => { showLib(); } } }, '← Back'),
+  box.append(h('div', { class: 'row' }, h('button', { on: { click: () => { showLib(); refresh(); } } }, '← Back'),
     h('span', { class: 'mono', style: 'color:var(--mut)' }, g.path)));
   box.append(h('h2', {}, g.map + ' · ' + g.mode + ' · ' + fmt(g.duration_s)));
   box.append(h('div', { class: 'sub' }, new Date(g.played_at).toLocaleString() + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : '')));

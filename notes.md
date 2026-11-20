@@ -50,3 +50,41 @@ Findings and decisions made while building. Newest entries go at the bottom.
 - Openers that match no rule get the tag `build:unnamed`. The evidence holds the structure order and the notation. This keeps the tag list short.
 - Sample openers recognised: 12-pool, hatch-first, gas-first, reaper-expand, rax-expand, 2-rax-no-expand, gate-expand, forge-expand, 2-gate, plus `stargate-opener`.
 - No cannon-rush appeared in the samples. The forge game (3 cannons at 2:00) was classed `forge-expand` because its cannons were near its own base. The rush distance check is untested on a real rush.
+
+## Page, server and one-file build (built and browser-tested)
+
+Tested in headless Chromium (snap) driven by puppeteer-core. Checks that passed:
+- sqlite-wasm loads the Python-built file. FTS5 `trigram` works in the browser (M0 done): "nuke" finds `group:nuke` and `skill:TacticalNukeStrike` through synonyms.
+- Build timing filter: "first Barracks before 0:45" gave 2 games, the same as a direct SQL count. Histogram slider natural 1:40–2:00 gave 4 games, the same as SQL.
+- Notes, marks, user tags and note-text search work. Notes are keyed by file sha256 and also store the header fingerprint.
+- Folder picker (copied from `_uimerge.py`): the tree lists only folders that hold replays. Picking a folder scopes the list and the histograms to it.
+- Rescan adds new files and drops removed ones. Broken files show as error cards. Identical files are reported as duplicates, and the first path in sorted order wins.
+- `python scry.py --bundle dist/scry.py` writes the one-file build (about 100 KB). It was run from an empty folder: it downloaded sqlite-wasm, scanned and served the embedded page.
+
+Things learned:
+- Warp-ins (Stalker, Zealot) fire `UnitInitEvent` like buildings. Filter with `unit.is_building`, or the build order fills with warp-ins.
+- `UpgradeTo...` commands duplicate the morph events. They are dropped from build steps.
+- The gzip response is about 3x smaller than the file: 610 KB became 199 KB for 6 replays.
+- Child tables must use an integer key. See the parser notes above.
+- `sqlite3_deserialize` needs a plain `Uint8Array` in Node. The browser accepted the same call.
+- `pkill -f "scry.py ..."` kills the calling shell when the same command line contains the pattern. Use `pgrep -f "[s]cry.py"` in a separate command.
+- Snap Chromium cannot write screenshots to `/tmp`. Use puppeteer, which writes the file from Node.
+- Typing in the notes box scrolls the game view. A test that drags on the ruler must scroll back to the top first.
+
+Design choices made without asking (change them if they feel wrong):
+- The folder picker's root is the current folder, or `--root`. `.scry/` inside the root holds the database and the vendor files.
+- The first run needs internet once for sqlite-wasm. Offline machines can copy the two files into `.scry/vendor/`.
+- Search covers tag labels, synonyms, chat text and note text. Tags in one filter all must match (AND). The sidebar has no OR across tags yet.
+- Clicking a tag cycles include, exclude, clear.
+- With a player selected, tag filters only count tags that belong to that player (a checkbox turns this off).
+- Game cards show each player's opener and a few game-level tags. Economy tags (floating bank, fast third, maxed out) show only on the game page.
+
+Known gaps and follow-ups:
+- 1v1, AI, custom and observer games are untested.
+- The `errors` list from the scan (duplicates and parse failures) is only visible in the browser console and as error cards.
+- The database download is the whole file on every change. Fine at 20 MB, slow beyond that.
+- Scanning hundreds of replays: about 0.15 s each with 6 workers on this machine. Not measured at scale.
+- `shape:comeback` is still not implemented.
+- Timeline hover shows the nearest earlier stat sample, so values lag by up to 7 s.
+- Marks can only be added by dragging on the ruler. No edit of existing marks.
+- Cannon-rush detection was not exercised by any sample replay.

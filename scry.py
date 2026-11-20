@@ -718,8 +718,8 @@ def scan(state, workers=None):
                     del known[rel]
             con.commit()
         by_id = {v[0]: k for k, v in known.items()}
-        todo = []
-        for rel, full in on_disk.items():
+        todo, queued = [], {}
+        for rel, full in sorted(on_disk.items()):
             st = os.stat(full)
             k = known.get(rel)
             if k and k[1] == st.st_size and abs(k[2] - st.st_mtime) < 1e-3:
@@ -734,6 +734,10 @@ def scan(state, workers=None):
             if sha in by_id and by_id[sha] != rel:
                 state.errors.append('duplicate of %s: %s' % (by_id[sha], rel))
                 continue
+            if sha in queued:  # same bytes twice in one scan: the first path (sorted order) wins
+                state.errors.append('duplicate of %s: %s' % (queued[sha], rel))
+                continue
+            queued[sha] = rel
             todo.append((rel, full, sha, st.st_size, st.st_mtime))
         state.total = len(todo)
         state.message = 'parsing %d replay(s)' % len(todo)
@@ -816,7 +820,8 @@ def ensure_vendor(vdir):
 # HTTP
 # ----------------------------------------------------------------------------
 
-PAGE_EMBEDDED = None  # @@PAGE@@ (make bundle replaces this line with the page)
+# 'scry.py --bundle FILE' replaces the next line with the page, to make a one-file build.
+PAGE_EMBEDDED = None  # @@PAGE@@
 
 
 def load_page():
@@ -825,6 +830,22 @@ def load_page():
     path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'page.html')
     with open(path, 'r', encoding='utf8') as f:
         return f.read()
+
+
+def bundle(out):
+    """Write a single-file copy of this script with page.html embedded."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(here, 'page.html'), 'r', encoding='utf8') as f:
+        page = f.read()
+    with open(os.path.realpath(__file__), 'r', encoding='utf8') as f:
+        src = f.read()
+    marker = 'PAGE_EMBEDDED = None' + '  # @@PAGE@@'
+    if src.count(marker) != 1:
+        sys.exit('bundle: marker line not found exactly once')
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    with open(out, 'w', encoding='utf8', newline='\n') as f:
+        f.write(src.replace(marker, 'PAGE_EMBEDDED = ' + repr(page)))
+    print('wrote %s (%d KB)' % (out, os.path.getsize(out) // 1024))
 
 
 def build_tree(state):
@@ -934,7 +955,10 @@ def main():
     ap.add_argument('--scan-only', action='store_true', help='update the database and exit')
     ap.add_argument('--no-scan', action='store_true', help='serve the existing database without scanning')
     ap.add_argument('--open', action='store_true', help='open the page in the default browser')
+    ap.add_argument('--bundle', metavar='FILE', help='write a single-file copy of this tool and exit')
     args = ap.parse_args()
+    if args.bundle:
+        return bundle(args.bundle)
 
     root = os.path.realpath(args.root)
     if not os.path.isdir(root):
