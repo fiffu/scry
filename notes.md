@@ -183,3 +183,25 @@ Limits and open points:
 - The matchup "one side set" case matches either team. It does not know which team is "left".
 - Card layout: "stacked horizontally" in the feedback was read as teams side by side, with players listed top to bottom inside a team.
 - Hover states were checked through computed styles of the pseudo-element. Appearance was checked only in light mode.
+
+## UI feedback round 2 (2026-11-21)
+
+Changes:
+- Players: a collapsed section, closed by default. The list covers the whole folder, not the current result, so it does not shift while filtering. A selected player shows as an active filter chip.
+- The NOT modifier is gone. Clicking a tag chip turns it on or off. Hover shows `+` to add and `−` to remove.
+- Map is its own section directly under Matchup, in alphabetical order.
+- Dates read `31 Jan 2026` on cards and on the game page. The full local date and time are in the tooltip.
+- Tag order: builds, units, upgrades, skills, skill groups, game highlights, economy, social (mine last).
+- Skill group labels are plural: macro abilities, creep tumors, detection abilities, nukes, stims, spells, mode switches, speed boosts. The labels live in `GROUP_LABEL` in `scry.py`.
+- The `people` tags are now `social`. New tags `social:cyka` and `social:blyat` fire when a player types the word in chat (case does not matter, parts of words count). They belong to the speaker, with a span at each message, so the player scope option applies. `CHAT_WORDS` in `scry.py` lists them. None of the 6 sample replays contains either word, so only a unit test of `add_chat_word_tags()` covers this.
+- Pills keep their size on hover. The count stays in place with transparent text and the `+` is drawn over it.
+- Matchup buttons have a dim tint of the race colour when not selected.
+- Parser version is now 5.
+
+Checks: players closed by default and unchanged by a filter, no `neg` class anywhere, sidebar order, facet order, plural labels, date format, pill size equal before and after hover (135.6 x 26), tinted button colours. Server-mode regression and the static site test pass.
+
+Skill groups as a quick selector (not built, needs a decision):
+- Group membership is a hand-written table (`SKILL_GROUPS`). It does not need many replays, but it only covers abilities seen so far. A new ability from a new replay has no group until someone adds it. The replay data has no ability categories, so grouping cannot be learned from replays.
+- Today a group tag already means "any ability in the group", computed when the replay is parsed.
+- A true multi-select needs a rule for several skills at once. Tag filters currently AND. A quick selector wants "any of these". Choosing OR inside the Skills list would also change what two clicked skills mean.
+- Other facet lists (builds, skills and so on) still reorder by count while filtering. Only the player list was made stable.

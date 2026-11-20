@@ -30,21 +30,21 @@ textarea{padding:6px 8px;width:100%;min-height:80px;resize:vertical}
 aside{min-height:0;overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);padding:10px 12px}
 aside h4{margin:14px 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
 aside h4:first-child{margin-top:0}
+aside details.sec>summary{margin:14px 0 6px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
 #list{min-height:0;overflow-y:auto;padding:12px 16px}
 .row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{display:inline-flex;gap:5px;align-items:center;min-height:26px;padding:0 8px;border-radius:13px;border:1px solid var(--line);background:var(--bg);font-size:12.5px;cursor:pointer;white-space:nowrap}
 .chip.on{background:var(--accbg);border-color:var(--acc)}
-.chip.neg{background:color-mix(in srgb,var(--warn) 15%,var(--panel));border-color:var(--warn);text-decoration:line-through}
 .chip small{color:var(--mut);font-size:11px}
 .chip.flat{cursor:default}
 .chip.mine{border-color:var(--ob);background:var(--obbg)}
 .chip.sm{min-height:20px;padding:0 7px;font-size:11.5px}
 .chip:not(.flat):hover{border-color:var(--acc)}
-.fc:hover small{font-size:0}
-.fc:hover small::after{content:'+';font-size:15px;line-height:1;font-weight:700;color:var(--acc)}
+.fc small{position:relative;display:inline-block;min-width:.8em;text-align:center}
+.fc:hover small{color:transparent}
+.fc:hover small::after{content:'+';position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:700;color:var(--acc)}
 .fc.on:hover small::after{content:'\2212'}
-.fc.neg:hover small::after{content:'\00d7'}
 #sugg{position:absolute;z-index:20;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004;max-height:300px;overflow:auto}
 #sugg button{display:flex;width:100%;justify-content:space-between;border:0;border-radius:0;text-align:left}
 #sugg button.sel{background:var(--accbg)}
@@ -110,6 +110,12 @@ th{color:var(--mut);font-weight:600;font-size:12px}
 .mu button.on{color:#fff;border-color:transparent}
 .mu button.P.on{background:#b08d1f}.mu button.T.on{background:#3f7cc0}.mu button.Z.on{background:#9a46b8}
 .mu .vs{color:var(--mut);font-size:12px}
+.mu button.P{background:color-mix(in srgb,#b08d1f 16%,var(--panel));border-color:color-mix(in srgb,#b08d1f 38%,var(--line))}
+.mu button.T{background:color-mix(in srgb,#3f7cc0 16%,var(--panel));border-color:color-mix(in srgb,#3f7cc0 38%,var(--line))}
+.mu button.Z{background:color-mix(in srgb,#9a46b8 16%,var(--panel));border-color:color-mix(in srgb,#9a46b8 38%,var(--line))}
+.mu button.P:hover{background:color-mix(in srgb,#b08d1f 30%,var(--panel))}
+.mu button.T:hover{background:color-mix(in srgb,#3f7cc0 30%,var(--panel))}
+.mu button.Z:hover{background:color-mix(in srgb,#9a46b8 30%,var(--panel))}
 #lib.welcome{grid-template-columns:1fr}#lib.welcome aside{display:none}
 @media (max-width:900px){#lib{grid-template-columns:1fr;grid-auto-rows:auto;overflow-y:auto}aside{border-right:0;border-bottom:1px solid var(--line);max-height:60vh}}
 </style></head><body>
@@ -138,13 +144,17 @@ th{color:var(--mut);font-weight:600;font-size:12px}
   </div>
   <h4>Active filters <button id="clear" style="min-height:22px;padding:0 8px;font-size:12px">clear</button></h4>
   <div class="chips" id="active"></div>
-  <h4>Players</h4>
-  <div class="chips" id="players"></div>
-  <label class="row" id="scoperow" hidden style="margin-top:6px;font-size:12.5px;color:var(--mut)"
-    title="On: a tag such as Stim only counts if the selected player used it. Off: anyone in the game may have used it.">
-   <input type="checkbox" id="scope" checked> Only count what the selected player did</label>
+  <details class="sec" id="playersec">
+   <summary>Players</summary>
+   <div class="chips" id="players"></div>
+   <label class="row" id="scoperow" hidden style="margin-top:6px;font-size:12.5px;color:var(--mut)"
+     title="On: a tag such as Stim only counts if the selected player used it. Off: anyone in the game may have used it.">
+    <input type="checkbox" id="scope" checked> Only count what the selected player did</label>
+  </details>
   <h4>Matchup</h4>
   <div class="mu" id="matchup"></div>
+  <h4>Map</h4>
+  <div class="chips" id="maps"></div>
   <h4>Build timing</h4>
   <div id="conds"></div>
   <button id="addcond">+ Add condition</button>
@@ -182,6 +192,8 @@ const ph = n => Array(n).fill('?').join(',');
 const likeEsc = s => s.replace(/[\\%_]/g, c => '\\' + c);
 const ftsq = s => '"' + s.replace(/"/g, '""') + '"';
 const RACE = { Terran: 'T', Protoss: 'P', Zerg: 'Z' };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fmtDate(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
 
 /* Each player keeps one colour everywhere. The hue comes from a hash of the player id, so it never changes. */
 function hashStr(s) { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; }
@@ -198,8 +210,10 @@ const TAG_INFO = {
   'spectacle:big-fight': 'A fight where 5,000 or more resources were lost.',
   'spectacle:base-kill': 'A town hall was destroyed by the other team.',
   'spectacle:base-trade': 'Both teams lost a town hall within 90 seconds of each other.',
-  'people:leaver': 'A player left more than a minute before the game ended.',
-  'people:chat': 'Players chatted after the first minute.',
+  'social:leaver': 'A player left more than a minute before the game ended.',
+  'social:chat': 'Players chatted after the first minute.',
+  'social:cyka': 'A player typed "cyka" in chat.',
+  'social:blyat': 'A player typed "blyat" in chat.',
   'econ:maxed-out': 'A player reached 200 supply.',
   'econ:floating-bank': 'A player held 5,000 or more unspent minerals for about a minute.',
   'econ:fast-third': 'A player started a third base before 3:20.',
@@ -257,9 +271,8 @@ function describe(tag, label) {
 }
 function toggleInclude(tag) {
   const f = tagState(tag);
-  if (f && !f.neg) S.tags.splice(S.tags.indexOf(f), 1);
-  else if (f) f.neg = false;
-  else S.tags.push({ tag, neg: false });
+  if (f) S.tags.splice(S.tags.indexOf(f), 1);
+  else S.tags.push({ tag });
   refresh();
 }
 
@@ -441,7 +454,7 @@ function whereSql() {
     p.push(f.tag);
     if (scoped) { sql += ` and (t.pid is null or ${playerScope('t')})`; p.push(...S.players.keys()); }
     sql += ')';
-    w.push(f.neg ? 'not ' + sql : sql);
+    w.push(sql);
   }
   if (S.players.size) { w.push(`exists (select 1 from players q where q.rid=r.rid and q.toon in (${ph(S.players.size)}))`); p.push(...S.players.keys()); }
   if (muActive()) {
@@ -495,7 +508,8 @@ function refresh() {
 function renderActive() {
   const box = $('#active'); box.replaceChildren();
   const x = (label, cls, fn, title) => box.append(h('span', { class: 'chip ' + cls, title: title || '', on: { click: fn } }, label, h('small', {}, '✕')));
-  S.tags.forEach((f, i) => x((f.neg ? 'NOT ' : '') + f.tag, f.neg ? 'neg' : 'on', () => { S.tags.splice(i, 1); refresh(); }, 'Remove'));
+  S.tags.forEach((f, i) => x(f.tag, 'on', () => { S.tags.splice(i, 1); refresh(); }, 'Remove'));
+  for (const [toon, name] of S.players) x('player: ' + name, 'on', () => { S.players.delete(toon); refresh(); }, 'Remove');
   S.texts.forEach((t, i) => x('text: ' + t, 'on', () => { S.texts.splice(i, 1); refresh(); }, 'Remove'));
   if (muActive()) x('matchup: ' + muLabel(), 'on', () => { S.mu = { a: [], b: [] }; refresh(); }, 'Remove');
   for (const [k, [lo, hi]] of Object.entries(S.ranges)) {
@@ -511,8 +525,10 @@ $('#clear').onclick = () => {
 /* ---- players */
 function renderPlayers() {
   const box = $('#players'); box.replaceChildren();
+  // The list covers the whole folder, not the current result, so it does not shift while filtering.
   const list = rows(`select toon, max(name) name, count(distinct rid) c from players
-    where rid in (select rid from sel) and toon not like 'name:%' group by toon order by c desc, name limit 24`);
+    where ${S.folder ? "rid in (select rid from replays where path like ? escape '\\')" : '1'} and toon not like 'name:%'
+    group by toon order by c desc, name limit 60`, S.folder ? [likeEsc(S.folder) + '/%'] : []);
   const seen = new Set(list.map(r => r.toon));
   for (const [toon, name] of S.players) if (!seen.has(toon)) list.unshift({ toon, name, c: 0 });
   for (const r of list) {
@@ -528,34 +544,26 @@ function renderPlayers() {
 $('#scope').onchange = e => { S.scope = e.target.checked; refresh(); };
 
 /* ---- facets */
-const FAMS = [['map', 'Map', ['map']], ['build', 'Builds', ['build']], ['group', 'Skill groups', ['group']],
-  ['skill', 'Skills', ['skill']], ['unit', 'Units', ['unit']], ['upgrade', 'Upgrades', ['upgrade']],
-  ['highlights', 'Game highlights', ['shape', 'spectacle']], ['econ', 'Economy', ['econ']],
-  ['people', 'People', ['people']], ['mine', 'Mine', ['mine']]];
+const FAMS = [['build', 'Builds', ['build']], ['unit', 'Units', ['unit']], ['upgrade', 'Upgrades', ['upgrade']],
+  ['skill', 'Skills', ['skill']], ['group', 'Skill groups', ['group']], ['highlights', 'Game highlights', ['shape', 'spectacle']],
+  ['econ', 'Economy', ['econ']], ['social', 'Social', ['social']], ['mine', 'Mine', ['mine']]];
 const openFams = new Set(['build', 'group', 'highlights']);
 const famAll = new Set();
 function tagState(tag) { return S.tags.find(f => f.tag === tag); }
-function cycleTag(tag) {
-  const f = tagState(tag);
-  if (!f) S.tags.push({ tag, neg: false });
-  else if (!f.neg) f.neg = true;
-  else S.tags.splice(S.tags.indexOf(f), 1);
-  refresh();
-}
 function renderFacets() {
   const box = $('#facets'); box.replaceChildren();
   const counts = rows(`select family, tag, label, count(distinct rid) c from all_tags
     where rid in (select rid from sel) group by family, tag, label order by c desc, label`);
   const by = {};
   for (const r of counts) (by[r.family] ||= []).push(r);
-  // An excluded tag has no matching games left, so it would drop out of the list. Keep it, so it can be cleared.
-  for (const f of S.tags) {
-    const fam = f.tag.split(':')[0];
-    if (!(by[fam] || []).some(r => r.tag === f.tag)) {
-      const lab = (rows('select label from all_tags where tag=? limit 1', [f.tag])[0] || {}).label || f.tag;
-      (by[fam] ||= []).push({ family: fam, tag: f.tag, label: lab, c: 0 });
-    }
-  }
+  const chipFor = (r, extra) => {
+    const st = tagState(r.tag);
+    return h('span', { class: 'chip fc' + (st ? ' on' : '') + (extra || ''), title: describe(r.tag, r.label), on: { click: () => toggleInclude(r.tag) } },
+      r.label, h('small', {}, String(r.c)));
+  };
+  const maps = $('#maps'); maps.replaceChildren();   // maps sit under the matchup, in a steady (alphabetical) order
+  for (const r of (by.map || []).slice().sort((x, y) => x.label.localeCompare(y.label))) maps.append(chipFor(r));
+  if (!maps.childElementCount) maps.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'no maps'));
   for (const [fam, title, srcs] of FAMS) {
     const list = srcs.flatMap(f => by[f] || []).sort((x, y) => y.c - x.c || x.label.localeCompare(y.label));
     const d = h('details', { open: openFams.has(fam) });
@@ -564,9 +572,7 @@ function renderFacets() {
     const chips = h('div', { class: 'chips' });
     const limit = famAll.has(fam) ? 1e9 : 14;
     for (const r of list.slice(0, limit)) {
-      const st = tagState(r.tag);
-      chips.append(h('span', { class: 'chip fc' + (st ? (st.neg ? ' neg' : ' on') : '') + (fam === 'mine' ? ' mine' : ''),
-        title: describe(r.tag, r.label), on: { click: () => cycleTag(r.tag) } }, r.label, h('small', {}, String(r.c))));
+      chips.append(chipFor(r, fam === 'mine' ? ' mine' : ''));
     }
     if (list.length > limit) chips.append(h('span', { class: 'chip', on: { click: () => { famAll.add(fam); renderFacets(); } } }, '+' + (list.length - limit) + ' more'));
     d.append(chips);
@@ -596,7 +602,7 @@ function suggest() {
   box.hidden = !suggItems.length;
 }
 function pick(it) {
-  if (it.kind === 'tag') { if (!tagState(it.tag)) S.tags.push({ tag: it.tag, neg: false }); }
+  if (it.kind === 'tag') { if (!tagState(it.tag)) S.tags.push({ tag: it.tag }); }
   else if (!S.texts.includes(it.text)) S.texts.push(it.text);
   $('#q').value = ''; $('#sugg').hidden = true; refresh();
 }
@@ -740,7 +746,7 @@ function renderList() {
   const pls = {}, tgs = {};
   if (ids.length) {
     for (const p of rows(`select rid, pid, toon, name, team, race, result, apm_blizzard apm from players where rid in (${ph(ids.length)}) order by team, pid`, ids)) (pls[p.rid] ||= []).push(p);
-    for (const t of rows(`select rid, pid, tag, label, family, evidence from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','people')`, ids)) (tgs[t.rid] ||= []).push(t);
+    for (const t of rows(`select rid, pid, tag, label, family, evidence from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','social')`, ids)) (tgs[t.rid] ||= []).push(t);
   }
   box.append(h('div', { class: 'row', style: 'margin-bottom:8px;color:var(--mut)' }, 'Sorted by date, ',
     h('button', { style: 'min-height:24px', on: { click: () => { S.desc = !S.desc; renderList(); } } }, S.desc ? 'newest first' : 'oldest first')));
@@ -755,7 +761,7 @@ function renderList() {
     // A pill applies its tag as a filter. stopPropagation keeps the click from opening the game.
     const pill = (t, cls, text) => {
       const st = tagState(t.tag);
-      return h('span', { class: 'chip' + (cls ? ' ' + cls : '') + (st && !st.neg ? ' on' : ''),
+      return h('span', { class: 'chip' + (cls ? ' ' + cls : '') + (st ? ' on' : ''),
         title: describe(t.tag, t.label) + (t.evidence ? ' (' + t.evidence + ')' : ''),
         on: { click: e => { e.stopPropagation(); toggleInclude(t.tag); } } }, text || t.label);
     };
@@ -774,15 +780,15 @@ function renderList() {
     const chipEls = [];
     for (const t of tagsOf) {
       if (t.family === 'build') continue;                     // builds sit next to the player
-      if (t.pid != null && t.family !== 'people') continue;   // per-player economy shows on the game page
-      if (t.tag === 'people:chat') continue;
+      if (t.pid != null && t.family !== 'social') continue;   // per-player economy shows on the game page
+      if (t.tag === 'social:chat') continue;
       const who = t.pid != null ? (players.find(x => x.pid === t.pid) || {}).name : null;
       chipEls.push(pill(t, '', (who ? who + ': ' : '') + t.label));
     }
     box.append(h('div', { class: 'card', on: { click: () => openGame(g.rid) } },
       h('div', { class: 'top' }, h('b', {}, g.map), h('span', {}, g.mode + ' · ' + fmt(g.duration_s)),
         notes[g.id] && (mine.text || (mine.tags || []).length || (mine.marks || []).length) ? h('span', { class: 'chip mine flat' }, 'notes') : null,
-        h('span', { class: 'when' }, new Date(g.played_at).toLocaleString())),
+        h('span', { class: 'when', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at))),
       h('div', { class: 'teams', style: 'grid-template-columns:repeat(' + Math.max(1, teamNums.length) + ',minmax(0,1fr))' }, ...teamEls),
       h('div', { class: 'chips' }, ...chipEls.slice(0, 18))));
   }
@@ -841,7 +847,7 @@ function openGame(rid) {
 const COLORS = ['#e07a1f', '#2a9d8f', '#d1497b', '#7a5cd1', '#c9a227', '#3b7fb5', '#6aa84f', '#c0392b'];
 function activeTagList(d) {
   const tags = [];
-  for (const f of S.tags) if (!f.neg) tags.push(f.tag);
+  for (const f of S.tags) tags.push(f.tag);
   for (const t of d.pick.keys()) if (!tags.includes(t)) tags.push(t);
   return tags;
 }
@@ -853,7 +859,7 @@ function renderGame() {
   box.append(h('div', { class: 'row' }, h('button', { on: { click: () => { showLib(); refresh(); } } }, '← Back'),
     h('span', { class: 'mono', style: 'color:var(--mut)' }, g.path)));
   box.append(h('h2', {}, g.map + ' · ' + g.mode + ' · ' + fmt(g.duration_s)));
-  box.append(h('div', { class: 'sub' }, new Date(g.played_at).toLocaleString() + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : '')));
+  box.append(h('div', { class: 'sub', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at) + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : '')));
 
   const pt = h('table', {}, h('tr', {}, ...['', 'Player', 'Team', 'Race', 'Result', 'MMR', 'APM', 'Build'].map(x => h('th', {}, x))));
   for (const p of d.players) {
@@ -868,7 +874,7 @@ function renderGame() {
   box.append(h('div', { class: 'panel' }, pt));
 
   // tags on this game
-  const gtags = d.tags.filter(t => ['shape', 'spectacle', 'people'].includes(t.family));
+  const gtags = d.tags.filter(t => ['shape', 'spectacle', 'social'].includes(t.family));
   if (gtags.length) box.append(h('div', { class: 'panel' }, h('h3', {}, 'What stands out'),
     h('div', { class: 'chips' }, ...gtags.map(t => h('span', { class: 'chip flat', title: t.evidence }, (t.pid != null ? nameOf(t.pid) + ': ' : '') + t.label + (t.evidence ? ' · ' + t.evidence : ''))))));
 
@@ -889,7 +895,7 @@ function renderGame() {
     if (!by.size) continue;
     sk.append(h('div', { style: 'margin:6px 0 2px;font-weight:600' }, p.name));
     sk.append(h('div', { class: 'chips' }, ...[...by.entries()].sort((a, b) => b[1].n - a[1].n).map(([ab, e]) => {
-      const tag = 'skill:' + ab, on = d.pick.has(tag) || S.tags.some(f => f.tag === tag && !f.neg);
+      const tag = 'skill:' + ab, on = d.pick.has(tag) || S.tags.some(f => f.tag === tag);
       return h('span', { class: 'chip' + (on ? ' on' : ''), title: 'first at ' + fmt(e.first) + (e.grp ? ' · group ' + e.grp : ''), on: { click: () => {
         if (d.pick.has(tag)) d.pick.delete(tag); else d.pick.set(tag, true); renderGame(); } } }, ab, h('small', {}, 'x' + e.n));
     })));

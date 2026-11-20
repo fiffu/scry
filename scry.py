@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 4  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 5  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -87,6 +87,11 @@ SKILL_GROUPS = {
     'boost': {'MedivacSpeedBoost', 'HydraliskFrenzy'},
 }
 GROUP_OF = {a: g for g, names in SKILL_GROUPS.items() for a in names}
+# Plural names for the filter list: picking one means "any ability in the group".
+GROUP_LABEL = {'macro': 'macro abilities', 'creep': 'creep tumors', 'detection': 'detection abilities', 'nuke': 'nukes',
+               'stim': 'stims', 'spell': 'spells', 'mode': 'mode switches', 'boost': 'speed boosts'}
+# Words that get their own social tag when a player types them in chat (case does not matter).
+CHAT_WORDS = ('cyka', 'blyat')
 
 JUNK_UNITS = {
     'Larva', 'Egg', 'Broodling', 'BroodlingEscort', 'Locust', 'LocustMP', 'LocustMPFlying', 'Interceptor',
@@ -508,7 +513,7 @@ def parse_replay(path):
             tg.add(pid, 'skill', ab, 'exact', ab, '', [(t, t)])
             g = GROUP_OF.get(ab)
             if g:
-                tg.add(pid, 'group', g, 'exact', g, '', [(t, t)])
+                tg.add(pid, 'group', g, 'exact', GROUP_LABEL.get(g, g), '', [(t, t)])
         for u in sorted({u['name'] for u in born[pid]}):
             tg.add(pid, 'unit', u, 'exact', u, '', [(min(x['t'] for x in born[pid] if x['name'] == u),) * 2])
         for q, t, n in upgrades:
@@ -535,7 +540,7 @@ def parse_replay(path):
                    [(third, third)])
         lv = leaves.get(pid)
         if lv is not None and dur - lv >= CFG['leaver_gap_s']:
-            tg.add(pid, 'people', 'leaver', 'inferred', 'left early',
+            tg.add(pid, 'social', 'leaver', 'inferred', 'left early',
                    'left at %s, game ended %s' % (mmss(lv), mmss(dur)), [(lv, lv)])
 
     chat_rows = []
@@ -547,8 +552,9 @@ def parse_replay(path):
         chat_rows.append((pid, m.frame / FPS, text, 1 if getattr(m, 'to_all', True) else 0))
     late = [c for c in chat_rows if c[1] >= CFG['chat_after_s']]
     if late:
-        tg.add(None, 'people', 'chat', 'inferred', 'has chat', '%d message(s) after %s' % (len(late), mmss(CFG['chat_after_s'])),
+        tg.add(None, 'social', 'chat', 'inferred', 'has chat', '%d message(s) after %s' % (len(late), mmss(CFG['chat_after_s'])),
                [(c[1], c[1]) for c in late])
+    add_chat_word_tags(tg, chat_rows)
 
     winner = r.winner.number if r.winner else None
     cast_rows = [(p.pid, ab, GROUP_OF.get(ab, ''), t) for p in players for t, ab in cmds[p.pid]]
@@ -558,6 +564,14 @@ def parse_replay(path):
                     played_at=r.start_time.isoformat(), duration_s=round(dur, 1), winner_team=winner),
         players=player_rows, stats=stat_rows, casts=cast_rows, steps=step_rows, timings=timing_rows,
         fights=fight_rows, losses=loss_rows, apm=apm_rows, chat=chat_rows, tags=tg.rows, spans=tg.spans)
+
+
+def add_chat_word_tags(tg, chat_rows):
+    """One tag per watched word, on the player who typed it. The spans mark each message."""
+    for word in CHAT_WORDS:
+        for pid, t, text, _ in chat_rows:
+            if word in text.lower():
+                tg.add(pid, 'social', word, 'inferred', word, text, [(t, t)])
 
 
 def parse_job(args):
