@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 8  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 9  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -44,8 +44,6 @@ CFG = dict(
     short_game_s=10 * 60,
     stomp_ratio=3.0, stomp_min_loss=3000,
     slugfest_fights=8,
-    one_big_min=4000, one_big_share=0.5,
-    big_fight=5000,
     flip_min_fights=3, flip_fight_value=1500, flip_ratio=1.25,
     base_trade_window_s=90,
     float_bank=5000, float_ticks=8,
@@ -454,23 +452,9 @@ def parse_replay(path):
             else:
                 why = 'Team %d destroyed %dx more value than team %d' % (lo[0], round(hi[1] / lo[1]), hi[0])
             tg.add(None, 'shape', 'stomp', 'inferred', 'stomp', why)
-    fvals = []
-    for i, f in enumerate(fights):
-        fvals.append((i, sum(d['value'] for d in f)))
-    total_fight = sum(v for _, v in fvals)
     if len(fights) >= CFG['slugfest_fights']:
         tg.add(None, 'shape', 'slugfest', 'inferred', 'slugfest', plural(len(fights), 'fight'),
                [(f[0]['t'], f[-1]['t']) for f in fights])
-    if fvals:
-        bi, bv = max(fvals, key=lambda x: x[1])
-        if bv >= CFG['one_big_min'] and bv >= CFG['one_big_share'] * total_fight:
-            tg.add(None, 'shape', 'one-big-battle', 'inferred', 'one big battle',
-                   '%d%% of value destroyed at %s' % (round(100 * bv / total_fight), mmss(fights[bi][0]['t'])),
-                   [(fights[bi][0]['t'], fights[bi][-1]['t'])])
-        bigs = [(f[0]['t'], f[-1]['t']) for f, (_, v) in zip(fights, fvals) if v >= CFG['big_fight']]
-        if bigs:
-            tg.add(None, 'spectacle', 'big-fight', 'inferred', 'big fight',
-                   '%s of %s+ value at %s' % (plural(len(bigs), 'fight'), format(CFG['big_fight'], ','), times_text([b[0] for b in bigs])), bigs)
     # lead flips: which team lost more in each sizable fight
     losers = []
     for i, f in enumerate(fights):
@@ -486,12 +470,12 @@ def parse_replay(path):
 
     kills = sorted(hall_deaths, key=lambda h: h['t'])
     if kills:
-        tg.add(None, 'spectacle', 'base-kill', 'inferred', 'base kill', '%s destroyed at %s' % (plural(len(kills), 'town hall'), times_text([k['t'] for k in kills])),
+        tg.add(None, 'spectacle', 'base-kill', 'inferred', 'base kill', '%s destroyed at %s' % (plural(len(kills), 'base'), times_text([k['t'] for k in kills])),
                [(k['t'], k['t']) for k in kills])
         for a in kills:
             if any(b['team'] != a['team'] and abs(b['t'] - a['t']) <= CFG['base_trade_window_s'] for b in kills):
                 tg.add(None, 'spectacle', 'base-trade', 'inferred', 'base trade',
-                       'Both teams lost a town hall around %s' % mmss(a['t']),
+                       'Both teams lost a base around %s' % mmss(a['t']),
                        [(a['t'], a['t'])])
                 break
 

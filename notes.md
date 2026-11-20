@@ -258,3 +258,12 @@ Game page:
 - The Skills and Build orders panels use one subtitle style (`.subt`, 12 px, muted): "click to show on the timeline" and "first 10 minutes only".
 - Build order rows are more compact: no vertical cell padding, 12 px text, smaller key labels. Measured on a 154-row game: average row 26.5 px down to 18.9 px (single-step rows 16 px), table height 4103 px down to 2940 px. The taller rows are cells where one player did several things in the same second.
 - Idea, not built: the player names at the top of the build table scroll under the sticky game bar. A sticky header row under the bar would keep them visible.
+
+## UI feedback round 6 (2026-11-21)
+
+- Timeline notes: the text of each note is drawn in a strip above the ruler (20 px, only when some note has text). A text may run on until the next note starts and is then cut with an ellipsis (about 6.4 px per character). A purple bar under the text shows the note's time range. The tooltip on the note band is gone. Tested with two notes: "the big push into t…" (cut, the next note starts soon) and "defense holds". Everything else in the SVG sits in a `<g transform>` below the strip, so the ruler and lanes did not need new coordinates.
+- Wording: "mark" is now "note" everywhere on screen: legend "Your notes", hint "Drag anywhere on the timeline to add a note", button "Add note", list "Timeline notes", empty text "No timeline notes yet". The panel title is now "Notes (saved in this browser)". Saved data keeps its old field name `marks`, so notes saved earlier still load. The CSS class `.mark` and the element id `markform` also keep their names.
+- `shape:one-big-battle` and `spectacle:big-fight` are removed (parser, tooltips). They often appeared together and added little. `CFG` lost `one_big_min`, `one_big_share` and `big_fight`. Fight detection and the shaded fight bands on the timeline are unchanged. Parser version is now 9.
+- "town hall" is now "base" in all visible text: "2 bases destroyed at 9:51, 12:17", "Both teams lost a base around 7:23" and the two tooltips. Code names (`TOWNHALLS`) are unchanged. The two build rules that name the command center are specific on purpose.
+- The game bar is one row: back button, heading, and the file chip and date at the right (`margin-left:auto`). It is 55 px tall (about 100 px before) and stays pinned. On a 900 px screen it wraps to two lines.
+- Fixed while testing: on narrow screens the build table made the whole page scroll sideways by 11 px. It now scrolls inside its own panel.
