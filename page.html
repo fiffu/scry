@@ -1335,9 +1335,10 @@ function makeMap(d) {
       if (ep.kind === 'blast' && t < hit) {
         ctx.globalAlpha = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(t * 3)); ctx.strokeStyle = ep.colour; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.arc(x, y, Rr, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]);
-        ctx.setLineDash([0.1, 4]); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.globalAlpha = 0.9;           // dotted crosshair, reaching past the ring so it is easy to spot
-        ctx.beginPath(); ctx.moveTo(x - Rr * 2.2, y); ctx.lineTo(x + Rr * 2.2, y); ctx.moveTo(x, y - Rr * 2.2); ctx.lineTo(x, y + Rr * 2.2); ctx.stroke();
-        ctx.setLineDash([]); ctx.lineCap = 'butt'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 6.2832); ctx.fillStyle = ep.colour; ctx.fill();
+        const pc = colour.get(c.pid) || ep.colour;                // the crosshair is in the colour of the player who ordered the nuke
+        ctx.strokeStyle = pc; ctx.setLineDash([0.1, 4]); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.globalAlpha = 0.9;   // dotted, across the whole map
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(m.w, y); ctx.moveTo(x, 0); ctx.lineTo(x, m.h); ctx.stroke();
+        ctx.setLineDash([]); ctx.lineCap = 'butt'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 6.2832); ctx.fillStyle = pc; ctx.fill();
         continue;
       }
       const hold = Math.max(ep.lasts, 1.5 * mp.speed), a = ep.kind === 'area' ? (t <= c.t + hold ? 1 : Math.max(0, 1 - (t - c.t - hold) / 6)) : fade(t - hit);   // held at least 1.5 s of real time, so a short skill is still visible at a fast speed

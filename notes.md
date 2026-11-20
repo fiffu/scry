@@ -391,3 +391,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The APM line, its dots and its legend swatch are white now (they were teal).
 
 - Movement lines fade in 25 s now (`LINE_FADE_S`), counted from when the unit arrives. They took 90 s. Icons that were destroyed and skill diamonds still take 90 s. Checked: the path of a finished move still shows 17 s after arrival, while the unit moves on (ink 4), and is gone at 40 s (ink 0).
+
+- The nuke's dotted crosshair is in the colour of the player who ordered it, and its lines run across the whole minimap (edge to edge). The pulsing ring around the target stays red. Checked in a screenshot (a yellow player's nuke).
