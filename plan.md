@@ -17,6 +17,7 @@ The tool specializes in filtering. Each viewer has their own idea of a highlight
 | Players | Every player looks the same. The index can filter by player. |
 | Search | Tags, free text, exact skill names, and build timing conditions. |
 | Replay source | The folder is on another machine (a Windows computer). The user copies replays in. |
+| Static site | Same page, no server: Pyodide parses in Web Workers, sqlite-wasm queries, IndexedDB keeps the database. Built with `scry.py --site`. See notes.md. |
 
 ## Research notes
 

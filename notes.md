@@ -111,3 +111,39 @@ Still not verified: replays chosen through a file picker or directory handle, me
 Environment note: a local static server started with the default bind address (all network interfaces) was refused three times by the automatic permission check, with the reason "Undermining Oversight". The same server bound to 127.0.0.1 was allowed at once. The cause is probably the network exposure, but this is a guess. Bind local test servers to 127.0.0.1.
 
 Bug found by the comparison: unit tags came out in set order, so the output differed between runs (hash seed). Fixed with `sorted()`. The database content was never wrong, only the row order.
+
+## Static site: Python in the browser (built and browser-tested)
+
+`python scry.py --site site` (or `make site`) writes a folder that needs no Python server: `index.html` (this same `page.html`), `worker.mjs`, `scry.py`, `libs.zip` (sc2reader and mpyq source), `manifest.json`, and `vendor/` with sqlite-wasm and Pyodide. It is 15 MB. Serve it with any static server (`make serve-site`) or a static host.
+
+How it works:
+- One page, two backends. At startup the page asks `/api/status`. A server answers, and the page runs in server mode as before. Anything else (a static host answers 404) switches to browser mode.
+- Browser mode: the user picks a folder. Chromium's `showDirectoryPicker()` gives a handle that is saved in IndexedDB. Other browsers use `<input webkitdirectory>` and must pick the folder again each visit.
+- Parsing runs in up to 4 Web Workers. Each loads Pyodide, unpacks `libs.zip`, imports `scry.py` and calls the unchanged `parse_replay()`. The worker returns the record as JSON. Workers are stopped after each scan to free memory.
+- The page writes the rows into the in-memory sqlite-wasm database. After a scan it saves the exported database in IndexedDB. The next visit loads it, and only new or changed files are parsed.
+- `REC_TABLES` and `REPLAY_FIELDS` in `scry.py` describe how a record maps to tables. The Python `store()` and the JavaScript `storeRec()` both read them (the page gets them from `manifest.json`), so the two writers share one layout.
+- FTS5 tables moved to the temp schema (`temp.fts_tags`, `temp.fts_text`). This keeps them out of the exported database.
+
+Test results (headless Chromium, fake `showDirectoryPicker`, 6 sample replays plus broken files):
+- Database content built in the browser is identical to the one built by the Python server: 6 replays, 12 table groups each, 0 differences (compared by file hash, with row ids removed).
+- First scan: 8 files (6 replays, 2 broken) in 3.5 to 4.0 s, including worker start.
+- Rescan with no change: 0.6 s, nothing parsed. A removed file disappears. A renamed file keeps its data without a re-parse. Hidden folders and non-replay files are ignored. The duplicate is reported.
+- Reload: the database comes back from IndexedDB. Search, filters and the game page work on it.
+- Scale: 120 distinct files (the 6 replays plus unique trailing bytes) parsed in 20.7 s with 3 workers, 0.17 s per replay. The saved database was 9.7 MB. 60 files gave 0 error rows. The main-thread heap was 93 MB.
+- Fallback path (`<input webkitdirectory>`): works when files are given through a `DataTransfer`. Real `webkitRelativePath` handling is untested.
+- Server mode still passes the earlier browser tests (histogram, notes, marks, same-player scope).
+
+Not verified:
+- The real `showDirectoryPicker()` dialog, permission prompts, and restoring the saved handle in the next session. A fake handle cannot be stored in IndexedDB, so this needs a manual check in Chrome or Edge.
+- Firefox and Safari, including module workers.
+- Memory of the workers themselves (each runs its own Pyodide). Only the main-thread heap was measured.
+- Hosting on a real static host. The page needs HTTPS or localhost for `crypto.subtle`.
+- A phone browser.
+
+Things learned:
+- `python3 -m http.server` binds to all interfaces by default. See the permission note above. Use `--bind 127.0.0.1`.
+- Pyodide needs only 5 files from the npm package (`pyodide.mjs`, `pyodide.asm.mjs`, `pyodide.asm.wasm`, `python_stdlib.zip`, `pyodide-lock.json`). No separate packages: zlib, bz2, lzma and sqlite3 are included.
+- The 404 for `/api/status` in the console on a static host is how the page detects that no server exists.
+- `store()` in Python had a bug: a changed file at an existing path hit the unique path constraint. Fixed in both writers: the old row at that path is removed first.
+- The `--bundle` one-file build is the server version. The static site needs the source folder (`page.html`, `worker.mjs`), so `--site` refuses to run from the one-file build.
+- Pyodide's Python is 3.14 and the laptop's is 3.10. The parser output was identical.
