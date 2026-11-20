@@ -371,3 +371,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The canvas fallbacks for `--pl`, `--bg`, `--fg` and `--win` were light-theme values. They are dark values now.
 - My icon test assumed the X is brighter than the fill (true on light). On dark the X is darker: the centre of a destroyed building goes from 166 to 85. The probe reads "false", the picture is right.
 - Not checked: the phone layout, and the static site build with the dark theme.
+
+- Map icon outlines are a fixed dark colour (#0d1013, 90%) now. They were the pale text colour, which looked washed out on dark. A dark edge on a pale fill is crisp and keeps overlapping icons apart. Checked: darkest pixel of a standing building 55 against a fill of 166.

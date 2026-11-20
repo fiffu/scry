@@ -1288,25 +1288,25 @@ function makeMap(d) {
 
   // Every icon has an outline so it stays readable when icons pile up. A destroyed icon keeps its own shape
   // (square for a building, dot for a unit) and gets an X inside it, so you can tell which one died.
-  const ol = css.getPropertyValue('--fg').trim() || '#e4e8eb';   // dark outline on the light theme, light on the dark theme
+  const ol = '#0d1013';   // darker than the page, so a pale fill gets a crisp dark edge and overlapping icons stay apart
   function xmark(x, y, r, a) {
     ctx.globalAlpha = a; ctx.strokeStyle = bg; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
   }
   function square(x, y, sz, c, a, dead) {
     ctx.globalAlpha = a; ctx.fillStyle = c; ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
-    ctx.globalAlpha = a * 0.7; ctx.strokeStyle = ol; ctx.lineWidth = 1; ctx.strokeRect(x - sz / 2 + 0.5, y - sz / 2 + 0.5, sz - 1, sz - 1);
+    ctx.globalAlpha = a * 0.9; ctx.strokeStyle = ol; ctx.lineWidth = 1; ctx.strokeRect(x - sz / 2 + 0.5, y - sz / 2 + 0.5, sz - 1, sz - 1);
     if (dead) xmark(x, y, sz / 2 - 1.5, a);
   }
   function dot(x, y, r, c, a, dead) {
     ctx.globalAlpha = a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
-    ctx.globalAlpha = a * 0.7; ctx.strokeStyle = ol; ctx.lineWidth = 1; ctx.stroke();
+    ctx.globalAlpha = a * 0.9; ctx.strokeStyle = ol; ctx.lineWidth = 1; ctx.stroke();
     if (dead) xmark(x, y, r * 0.55, a);
   }
   function diamond(x, y, r, c, a) {
     ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath();
     ctx.globalAlpha = a; ctx.fillStyle = c; ctx.fill();
-    ctx.globalAlpha = a * 0.7; ctx.strokeStyle = ol; ctx.lineWidth = 1; ctx.stroke();
+    ctx.globalAlpha = a * 0.9; ctx.strokeStyle = ol; ctx.lineWidth = 1; ctx.stroke();
   }
   const plate = (x, y, w, h, r) => { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); };   // older browsers have no roundRect
   function paint() {
