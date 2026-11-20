@@ -384,3 +384,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 
 - A fight is a soft dark red stain on the map background now (a radial gradient, no ring and no pulse), drawn under every icon, bigger for more value lost, and fading over 12 s after the last death. It replaces the orange bobbing circle, which looked like an orbital scan. The legend shows a red block for it. Checked: ink around a fight is 2,434 during it against 1,115 forty seconds after, and the screenshot shows the stain under the icons.
 - Orbital scans are not plotted: a scan is a different skill (ScannerSweep) and has its own blue disc once switched on. The orbital command's own scan cast is the same ScannerSweep, so it is already covered.
+
+- The timeline's fight bands are the same dark red as the map stain now, with a gradient that is stronger in the middle and soft at the ends (it was a flat orange at 12%). The loss bars stay orange, so they still stand out against the red. Checked in a screenshot: all 14 fights in the test game are red bands.
