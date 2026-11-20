@@ -362,3 +362,12 @@ Checked with pixels (colour added around the spot, effect on minus effect off): 
 A first flash in white did nothing on the light map, because the background is already near white. It is now the skill's own colour.
 
 Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are only 1.5 to 2.25 units, so about 3 px on this map), a mothership recall circle, making nukes show without switching them on, and a sound.
+
+## Dark mode only, struck-through labels (2026-11-21)
+
+- Light mode is gone. The palette is the dark one, set on `:root` with `color-scheme: dark`, and the `prefers-color-scheme` block is removed. Checked: a browser that asks for light still gets the dark page (background 26,30,34).
+- Borders had poor contrast: `--line` was #394046 on a #23282d card (about 1.4:1). It is now #6b7681 (3.2:1 against a card, 3.6:1 against the page). Quiet dividers (table rows, the build-order separator, the team divider, note rows) use a new softer `--rule` (#394046), so the page does not turn into a grid of heavy lines. `--mut` was raised a little for the same reason.
+- The pop-up label for a destroyed base is struck through and no longer starts with "✕". Checked: 42 label-coloured pixels in the row through the text while it shows, 0 before the base falls.
+- The canvas fallbacks for `--pl`, `--bg`, `--fg` and `--win` were light-theme values. They are dark values now.
+- My icon test assumed the X is brighter than the fill (true on light). On dark the X is darker: the centre of a destroyed building goes from 166 to 85. The probe reads "false", the picture is right.
+- Not checked: the phone layout, and the static site build with the dark theme.
