@@ -88,3 +88,18 @@ Known gaps and follow-ups:
 - Timeline hover shows the nearest earlier stat sample, so values lag by up to 7 s.
 - Marks can only be added by dragging on the ruler. No edit of existing marks.
 - Cannon-rush detection was not exercised by any sample replay.
+
+## Pyodide feasibility (Node only, 2026-11-21)
+
+Question: could the whole tool run in the browser (Pyodide for parsing, sqlite-wasm for queries, no Python server)?
+
+Measured with `pyodide` 314.0.8 (Python 3.14.2) in Node, running the unchanged `scry.parse_replay()`:
+- Pyodide starts in about 1.5 s. `zlib`, `bz2`, `lzma` and `sqlite3` import without extra steps.
+- `sc2reader` 1.9.0 and `mpyq` import and run as plain source copied into the Pyodide file system. Pillow is not needed.
+- All 6 replays: 2.8 s in Pyodide against 2.0 s native (about 1.4x slower).
+- Output is identical to native Python 3.10 for all 6 replays, after sorting each row list.
+- Sizes: Pyodide core is 13 MB uncompressed (9.6 MB wasm, 2.5 MB stdlib zip, 1.2 MB loader). `sc2reader` + `mpyq` zip is 333 KB.
+
+Not verified: Pyodide inside a Web Worker in a real browser, loading a replay chosen in the browser, memory use over hundreds of replays. Two attempts to start a local static server for that test were refused by an automatic permission check, so the browser test was not run.
+
+Bug found by the comparison: unit tags came out in set order, so the output differed between runs (hash seed). Fixed with `sorted()`. The database content was never wrong, only the row order.

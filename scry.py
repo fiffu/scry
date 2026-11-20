@@ -515,7 +515,7 @@ def parse_replay(path):
             g = GROUP_OF.get(ab)
             if g:
                 tg.add(pid, 'group', g, 'exact', g, '', [(t, t)])
-        for u in {u['name'] for u in born[pid]}:
+        for u in sorted({u['name'] for u in born[pid]}):
             tg.add(pid, 'unit', u, 'exact', u, '', [(min(x['t'] for x in born[pid] if x['name'] == u),) * 2])
         for q, t, n in upgrades:
             if q == pid:
