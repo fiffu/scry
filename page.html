@@ -147,7 +147,6 @@ table.plain td,table.plain th{border-bottom:0}
  <button id="choose" hidden>Choose folder…</button>
  <progress id="bar" hidden></progress>
  <span id="prog"></span>
- <button id="rescan" title="Look for new or changed replays">Rescan</button>
  <button id="exp" title="Download your notes as a file">Export notes</button>
  <button id="imp" title="Load notes from a file">Import notes</button>
  <input id="impfile" type="file" accept="application/json,.json" hidden>
@@ -758,7 +757,7 @@ function renderList() {
       h('button', { class: 'pri', on: { click: chooseFolder } }, 'Choose folder…')));
     return;
   }
-  if (!total) { box.append(h('div', { class: 'empty' }, 'No replays found under ' + (S.folder || 'this folder') + '. Put .SC2Replay files here and press Rescan.')); return; }
+  if (!total) { box.append(h('div', { class: 'empty' }, 'No replays found under ' + (S.folder || 'this folder') + '. ' + (MODE === 'browser' ? 'Choose the folder again to look for new replays.' : 'Add .SC2Replay files and restart the server.'))); return; }
   if (!n) { box.append(h('div', { class: 'empty' }, 'No games match the filters.')); return; }
   const order = S.desc ? 'desc' : 'asc';
   const games = rows(`select r.rid, r.id, r.path, r.map, r.mode, r.played_at, r.duration_s, r.winner_team, r.error
@@ -1434,10 +1433,6 @@ function treeFromDb() {
 
 /* ------------------------------------------------------------------ startup */
 function toast(m, warn) { const s = $('#status'); s.textContent = m; s.classList.toggle('warn', !!warn); }
-$('#rescan').onclick = async () => {
-  if (MODE === 'browser') return bsrc ? scanBrowser() : chooseFolder();
-  await fetch('/api/rescan', { method: 'POST' }); poll();
-};
 async function poll() {
   let st;
   try { st = await (await fetch('/api/status', { cache: 'no-store' })).json(); } catch { return; }

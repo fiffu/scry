@@ -284,3 +284,11 @@ Related finds in the same replays:
 - A 198 s 2v2 on build 98370 triggered `cannon-rush` for one player. Checked by hand: a proxy pylon at 63 s, 173 units from their own base, a forge at 94 s, and cannons at 139 to 170 s that are 28 to 53 units from the enemy base. So the rule works on a real rush (first time it has seen one).
 - Newer builds (98370, 98745) parse without trouble. Pyodide and native Python give identical output on all 14 replays (Pyodide takes about 1.5x as long). The static site parsed the Russian-client replay and the `Gather` replay correctly.
 - 1v1 games: cards, game page, builds and the matchup widget all work. The matchup widget still shows two rows per side while the library holds 2v2 games.
+
+## Rescan button removed (2026-11-21)
+
+- The "Rescan" button and its handler are gone, because it did nothing visible. In the browser version, "Choose folder…" is the way to look for new, moved or removed replays: it runs the same incremental scan. Checked with a fake folder: one file removed, one moved and one broken file deleted, then "Choose folder…" gave the right 6 games. The old button started synchronously. "Choose folder…" waits for the picker first, so the text from the previous scan ("Up to date") stays for a moment.
+- The Python server version (`make run`) now has no way to rescan while running. It scans on start, so new replays need a restart. The `/api/rescan` route is still in `scry.py` but nothing calls it.
+- The "No replays found" message now says what works: choose the folder again (browser) or restart the server.
+- A remembered folder is not scanned again when the page loads, because Chrome asks for permission on a user click. Scanning on load when permission is already granted would be possible. Not built.
+- No unit tests for now. Everything tested so far was checked with throwaway scripts that are not in git.
