@@ -1203,14 +1203,22 @@ function drawTimeline(d, note) {
    - A unit is known at its birth, at death, and at the position snapshots the game logs about every 10 s.
      A dashed line joins two known points. It is not the path the unit took.
    - A skill has a place only when it was aimed at a point or a unit. Self-cast skills (siege, stim) have none.
-   A symbol is brightest when it is new and fades as the replay moves on. */
-const MAP_W = 340, FADE_S = 90;
+   Buildings and units stay at full strength while they live. When one is destroyed it becomes an X, and the X fades.
+   Movement lines and skill diamonds fade with their age too.
+   The game logs a unit only when it has moved, about every 10.7 s (T_TICK). So when two known places are one tick apart the
+   unit is drawn gliding between them, and when they are further apart it waits and then glides during the last tick.
+   Between snapshots that glide is a straight-line estimate. */
+const MAP_W = 340, FADE_S = 90, T_TICK = 10.7;
 const HALLS = new Set(['Nexus', 'CommandCenter', 'Hatchery', 'OrbitalCommand', 'PlanetaryFortress', 'Lair', 'Hive']);
 
 function buildMap(d) {
   const units = new Map(d.munits.map(u => [u.uid, { ...u, pts: [] }]));
   for (const q of d.mpts) { const u = units.get(q.uid); if (u) u.pts.push([q.t, q.x, q.y]); }
-  for (const u of units.values()) u.pts.sort((a, b) => a[0] - b[0]);
+  for (const u of units.values()) {
+    u.pts.sort((a, b) => a[0] - b[0]);
+    u.move = u.t1 == null ? u.pts : u.pts.filter(q => q[0] !== u.t1);   // known places while alive
+    u.dead = u.t1 == null ? null : (u.pts.find(q => q[0] === u.t1) || null);   // where it died: [t, x, y]
+  }
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
   const see = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
   for (const s of d.mstructs) see(s.x, s.y);
@@ -1237,50 +1245,65 @@ function makeMap(d) {
   const clock = h('span', { class: 'mono' });
   const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
   col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),
-    h('div', { class: 'subt', style: 'margin:6px 0 0' }, 'squares: buildings · dots: units · diamonds: skills · dashed: movement'));
+    h('div', { class: 'subt', style: 'margin:6px 0 0', title: 'Between two position snapshots a unit moves in a straight line. That is an estimate.' }, '■ building   ● unit   ◆ skill   ✕ destroyed   ╌╌ movement'));
 
   const css = getComputedStyle(document.documentElement);     // a canvas cannot use CSS variables, so read their values here
   const light = css.getPropertyValue('--pl').trim() || '38%', bg = css.getPropertyValue('--bg').trim() || '#e8ebee';
   const colour = new Map(d.players.map(pl => [pl.pid, `hsl(${plHue(pl)}, 62%, ${light})`]));
   const sx = x => (x - m.x0) * m.scale, sy = y => m.h - (y - m.y0) * m.scale;   // the game's y axis points up
-  const fade = (age, floor) => Math.max(floor, 1 - age / FADE_S);
+  const fade = age => Math.max(0, 1 - age / FADE_S);   // 1 when new, 0 after FADE_S seconds of replay time
 
   function paint() {
     const t = mp.t;
     ctx.globalAlpha = 1; ctx.fillStyle = bg; ctx.fillRect(0, 0, m.w, m.h);
-    for (const s of m.structs) {                              // buildings: squares, bigger for a base
-      if (s.t0 > t || (s.t1 != null && s.t1 <= t)) continue;
-      const sz = HALLS.has(s.name) ? 9 : 5;
-      ctx.globalAlpha = fade(t - s.t0, 0.18); ctx.fillStyle = colour.get(s.pid) || '#888';
-      ctx.fillRect(sx(s.x) - sz / 2, sy(s.y) - sz / 2, sz, sz);
+    const crosses = [], lines = [], dots = [];
+    for (const s of m.structs) {                              // buildings: a square while standing, an X once destroyed
+      if (s.t0 > t) continue;
+      const sz = HALLS.has(s.name) ? 9 : 5, c = colour.get(s.pid) || '#888';
+      if (s.t1 != null && s.t1 <= t) { const a = fade(t - s.t1); if (a > 0) crosses.push([sx(s.x), sy(s.y), sz / 2 + 1, a, c]); continue; }
+      ctx.fillStyle = c; ctx.fillRect(sx(s.x) - sz / 2, sy(s.y) - sz / 2, sz, sz);
     }
-    ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-    const dots = [];
-    for (const u of m.units) {                                // units: a dot at the last known place, a dashed line from the one before
-      if (u.t0 > t || (u.t1 != null && u.t1 <= t)) continue;
-      const pts = u.pts; let i = -1;
-      while (i + 1 < pts.length && pts[i + 1][0] <= t) i++;
+    for (const u of m.units) {                                // units: a dot, an X once dead, a dashed line for a move
+      if (u.t0 > t) continue;
+      const c = colour.get(u.pid) || '#888';
+      if (u.t1 != null && u.t1 <= t) { const a = fade(t - u.t1); if (a > 0 && u.dead) crosses.push([sx(u.dead[1]), sy(u.dead[2]), 3.5, a, c]); continue; }
+      const mv = u.move; let i = -1;
+      while (i + 1 < mv.length && mv[i + 1][0] <= t) i++;
       if (i < 0) continue;
-      const cur = pts[i], age = t - cur[0], c = colour.get(u.pid) || '#888';
-      if (i > 0) {
-        const pr = pts[i - 1];
-        if (Math.hypot(cur[1] - pr[1], cur[2] - pr[2]) > 0.5) {
-          ctx.globalAlpha = fade(age, 0) * 0.85; ctx.strokeStyle = c;
-          ctx.beginPath(); ctx.moveTo(sx(pr[1]), sy(pr[2])); ctx.lineTo(sx(cur[1]), sy(cur[2])); ctx.stroke();
+      const cur = mv[i], nxt = mv[i + 1];
+      let px = cur[1], py = cur[2], gliding = false;
+      if (nxt) {
+        const start = nxt[0] - cur[0] <= T_TICK * 1.2 ? cur[0] : nxt[0] - T_TICK;   // idle first if the gap is longer than a tick
+        if (t > start) {
+          const k = (t - start) / (nxt[0] - start);
+          px = cur[1] + (nxt[1] - cur[1]) * k; py = cur[2] + (nxt[2] - cur[2]) * k; gliding = true;
+          lines.push([cur[1], cur[2], px, py, 0.85, c]);
         }
       }
-      dots.push([sx(cur[1]), sy(cur[2]), fade(age, 0.15), c]);
+      if (!gliding && i > 0) {                                // the move that just ended, fading with its age
+        const pr = mv[i - 1], a = fade(t - cur[0]);
+        if (a > 0 && Math.hypot(cur[1] - pr[1], cur[2] - pr[2]) > 0.5) lines.push([pr[1], pr[2], cur[1], cur[2], a * 0.85, c]);
+      }
+      dots.push([sx(px), sy(py), c]);
     }
+    ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    for (const [x0, y0, x1, y1, a, c] of lines) { ctx.globalAlpha = a; ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(sx(x0), sy(y0)); ctx.lineTo(sx(x1), sy(y1)); ctx.stroke(); }
     ctx.setLineDash([]);
-    for (const [x, y, a, c] of dots) { ctx.globalAlpha = a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 6.2832); ctx.fill(); }
-    const on = new Set([...d.pick.keys()].map(k => k.slice(6)));   // skills: diamonds, only for the skills switched on
+    for (const [x, y, c] of dots) { ctx.globalAlpha = 1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 6.2832); ctx.fill(); }
+    ctx.lineWidth = 1.6;
+    for (const [x, y, r, a, c] of crosses) {                  // destroyed: an X that fades out
+      ctx.globalAlpha = a; ctx.strokeStyle = c;
+      ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+    }
+    const on = new Set([...d.pick.keys()].map(k => k.slice(6)));   // skills: diamonds, only for the skills switched on, fading out
     if (on.size) {
       for (const c of d.casts) {
         if (c.x == null || c.t > t || !on.has(c.ability)) continue;
+        const a = fade(t - c.t);
+        if (a <= 0) continue;
         const x = sx(c.x), y = sy(c.y), r = 5;
-        ctx.globalAlpha = fade(t - c.t, 0.2); ctx.fillStyle = colour.get(c.pid) || '#888';
+        ctx.globalAlpha = a; ctx.fillStyle = colour.get(c.pid) || '#888';
         ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = bg; ctx.lineWidth = 1; ctx.stroke();
       }
     }
     ctx.globalAlpha = 1;
