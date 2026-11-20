@@ -1327,7 +1327,9 @@ function makeMap(d) {
       if (ep.kind === 'blast' && t < hit) {
         ctx.globalAlpha = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(t * 3)); ctx.strokeStyle = ep.colour; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.arc(x, y, Rr, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]);
-        ctx.beginPath(); ctx.moveTo(x - Rr * 0.6, y); ctx.lineTo(x + Rr * 0.6, y); ctx.moveTo(x, y - Rr * 0.6); ctx.lineTo(x, y + Rr * 0.6); ctx.stroke();
+        ctx.setLineDash([0.1, 4]); ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.globalAlpha = 0.9;           // dotted crosshair, reaching past the ring so it is easy to spot
+        ctx.beginPath(); ctx.moveTo(x - Rr * 2.2, y); ctx.lineTo(x + Rr * 2.2, y); ctx.moveTo(x, y - Rr * 2.2); ctx.lineTo(x, y + Rr * 2.2); ctx.stroke();
+        ctx.setLineDash([]); ctx.lineCap = 'butt'; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 6.2832); ctx.fillStyle = ep.colour; ctx.fill();
         continue;
       }
       const a = ep.kind === 'area' ? (t <= c.t + ep.lasts ? 1 : Math.max(0, 1 - (t - c.t - ep.lasts) / 6)) : fade(t - hit);

@@ -375,3 +375,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - Map icon outlines are a fixed dark colour (#0d1013, 90%) now. They were the pale text colour, which looked washed out on dark. A dark edge on a pale fill is crisp and keeps overlapping icons apart. Checked: darkest pixel of a standing building 55 against a fill of 166.
 
 - The search suggestion box sits 6 px below the input (was touching it) and has 6 px of padding inside, so the first option is 13 px below the input instead of about 5.
+
+- The incoming-nuke marker has a dotted crosshair now (round dots, reaching 2.2 ring radii past the target, with a centre dot) on top of the pulsing dashed ring. It shows until the nuke lands. Checked in a 3x zoom screenshot.
