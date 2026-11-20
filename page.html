@@ -958,21 +958,32 @@ function renderGame() {
     if (!cell.has(s.pid)) cell.set(s.pid, []);
     cell.get(s.pid).push(s);
   }
+  // A key timing is not its own row. It is a small label on the step that happened at that moment (same time, same kind).
+  const KEY_LABEL = { natural: 'natural', third_base: 'third base', first_gas: 'first gas', first_production: 'first production', first_tech: 'first tech', first_army: 'first army' };
+  const keysOf = (pid, s) => d.timings.filter(k => k.pid === pid && KEY_LABEL[k.key] && Math.abs(k.t - s.t) < 1e-6
+    && s.kind === (k.key === 'first_army' ? 'unit' : 'struct')).map(k => KEY_LABEL[k.key]);
+  for (const k of d.timings) {   // 200 supply has no build step, so it gets a line of its own
+    if (k.key !== 'max_supply' || k.t > 600) continue;
+    const sec = Math.round(k.t);
+    if (!bySec.has(sec)) bySec.set(sec, new Map());
+    const cell = bySec.get(sec);
+    if (!cell.has(k.pid)) cell.set(k.pid, []);
+    cell.get(k.pid).push({ pid: k.pid, idx: -1, t: k.t, supply: 200, kind: 'key', name: 'Reached 200 supply' });
+  }
   const sep = (pl, i) => (i && pl.team !== players[i - 1].team ? ' sep' : '');
   const bt = h('table', { class: 'plain bo' },
     h('tr', {}, h('th', { class: 't' }), ...players.map((pl, i) => h('th', { class: sep(pl, i).trim() },
-      h('span', { class: 'race ' + (RACE[pl.race] || ''), style: 'margin-right:5px' }, RACE[pl.race] || '?'), nameSpan(pl)))),
-    h('tr', { class: 'kt' }, h('td', { class: 't' }, 'key'), ...players.map((pl, i) => h('td', { class: sep(pl, i).trim() },
-      h('div', { class: 'chips' }, ...d.timings.filter(t => t.pid === pl.pid).map(t => h('span', { class: 'chip flat sm' }, (THING_LABEL[t.key] || t.key) + ' ' + fmt(t.t))))))));
+      h('span', { class: 'race ' + (RACE[pl.race] || ''), style: 'margin-right:5px' }, RACE[pl.race] || '?'), nameSpan(pl)))));
   for (const sec of [...bySec.keys()].sort((x, y) => x - y)) {
     bt.append(h('tr', {}, h('td', { class: 't' }, fmt(sec)), ...players.map((pl, i) => {
       const list = bySec.get(sec).get(pl.pid) || [];
       return h('td', { class: (list.some(s => hitSet.has(pl.pid + ':' + s.idx)) ? 'hit' : '') + sep(pl, i) },
-        ...list.map(s => h('div', {}, h('span', { class: 'sup' }, String(s.supply)), s.name + (s.kind === 'research' || s.kind === 'morph' ? ' (' + s.kind + ')' : ''))));
+        ...list.map(s => h('div', {}, h('span', { class: 'sup' }, String(s.supply)), s.name + (s.kind === 'research' || s.kind === 'morph' ? ' (' + s.kind + ')' : ''),
+          ...keysOf(pl.pid, s).map(k => h('span', { class: 'chip flat sm', style: 'margin-left:8px' }, k)))));
     })));
   }
   box.append(h('div', { class: 'panel' }, h('h3', {}, 'Build orders'),
-    h('div', { style: 'color:var(--mut);font-size:12px;margin-bottom:6px' }, 'Time, then supply (approximate, ±2–3) and step. First 10 minutes.'), bt));
+    h('div', { style: 'color:var(--mut);font-size:12px;margin-bottom:6px' }, 'first 10 minutes only'), bt));
 
   // chat
   if (d.chat.length) {

@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 6  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 7  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -80,6 +80,7 @@ JUNK_UNITS = {
     'Changeling', 'ChangelingMarine', 'ChangelingZealot', 'ChangelingZergling', 'ForceField',
 }
 WORKERS = {'SCV', 'Probe', 'Drone'}
+NOT_ARMY = {'Overlord'}  # sc2reader calls it army. It is supply, so it must not count as the first army unit.
 TOWNHALLS = {'Nexus', 'CommandCenter', 'Hatchery'}
 TOWNHALL_FORMS = TOWNHALLS | {'OrbitalCommand', 'PlanetaryFortress', 'Lair', 'Hive'}
 GAS = {'Refinery', 'Extractor', 'Assimilator'}
@@ -291,7 +292,7 @@ def parse_replay(path):
             u = e.unit
             if e.frame == 0 and e.unit_type_name in TOWNHALLS:
                 starts[e.control_pid] = (e.x, e.y)
-            elif u and u.is_army and u.name not in JUNK_UNITS and (u.minerals or u.vespene):
+            elif u and u.is_army and u.name not in JUNK_UNITS and e.unit_type_name not in NOT_ARMY and (u.minerals or u.vespene):  # u.name is the LAST type: an overlord that became an overseer reports 'Overseer'
                 born[e.control_pid].append(dict(t=e.frame / FPS, name=e.unit_type_name))
         elif n == 'UnitInitEvent':
             u = e.unit

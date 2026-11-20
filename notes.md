@@ -228,3 +228,9 @@ Open points:
 - Hardcoded lists remain: the ability noise filter (`NOISE_EXACT`, `NOISE_PREFIX`) decides what counts as a skill, `SKILL_INFO` and `TAG_INFO` hold tooltip text, and `SYN` holds search synonyms. A missing entry only loses a nicety, except the noise filter, which decides what counts as a skill.
 - Marks are bookmarks on the timeline: a time range with a note, saved with the game in the browser. They may need a clearer name.
 - The build table shows only the first 10 minutes, as before. There is no "whole game" switch yet.
+
+## Build order table, second pass (2026-11-21)
+
+- Times appear only in the left column. A player's cell holds the supply and the step. The subtitle reads "first 10 minutes only".
+- The "key" row of timing chips is gone. A key timing is now a small label on the step that happened at that moment (natural, third base, first gas, first production, first tech, first army). Every timing except `max_supply` has a build step at exactly the same time and of the matching kind (checked on all 6 replays: 0 misses), so the match is exact. `max_supply` has no step, so it gets its own line, "Reached 200 supply", in that player's column (only if it happens within 10 minutes). All 24 labels in one game landed on the right step and column.
+- Parser bug found by this: an Overlord counted as "army", so a Zerg player's first army unit was an Overlord at about 0:30 and `unit:Overlord` was a tag. Fixed with `NOT_ARMY`. The check must use the type at birth (`e.unit_type_name`). sc2reader's `u.name` is the unit's LAST type, so an overlord that later became an overseer reports `Overseer` and slipped through the first version of the fix. Parser version is now 7. The "first army unit" histogram and filter are now correct for Zerg.
