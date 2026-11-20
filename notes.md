@@ -401,3 +401,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - Removed the "nuke lands" label and the dashed targeting ring. The nuke now shows: the player-coloured crosshair while it counts down, then the shockwave, flash and dim blast disc on landing. The cast label (the skill's name) still shows when the nuke is ordered. Checked: the effect is still present at impact (150,652) and gone by +100 s (95).
 
 - The minimap legend no longer lists the fight stain; it reads "■ building ● unit ◆ skill ✕ destroyed ╌╌ movement".
+
+- Destroyed buildings and units fade in 25 s now (`QUICK_FADE_S`), the same as movement lines. They took 90 s. Skill diamonds and the nuke's blast disc still take 90 s (`FADE_S`). Checked: a destroyed turret's icon window goes 13,295 (+3 s), 9,588 (+12 s), 412 (+30 s). A destroyed unit goes 9,216 (+2 s), 7,685 (+12 s), 0 (+30 s).
