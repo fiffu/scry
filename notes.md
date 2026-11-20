@@ -251,3 +251,10 @@ Library:
 Game page:
 - The stomp text now says who destroyed more: "Team 1 destroyed 4x more value than team 2". The team that lost less destroyed more, because its kills are the other team's losses. With a zero loss it reads "Team 1 destroyed 25,300 value, team 2 destroyed none". Parser version is now 8.
 - The heading moved into the sticky bar (`.gamebar`). Row one is the back button, row two is the heading with the file chip and date on the right. The bar has a bottom line, since it is taller now. Checked: heading above-left, meta at the right edge on the same row, both still visible after scrolling 2500 px.
+
+## UI feedback round 5 (2026-11-21)
+
+- A mark is saved with the Enter key in the text box, the same as the "Add mark" button. Enter on empty text saves a mark with no text.
+- The Skills and Build orders panels use one subtitle style (`.subt`, 12 px, muted): "click to show on the timeline" and "first 10 minutes only".
+- Build order rows are more compact: no vertical cell padding, 12 px text, smaller key labels. Measured on a 154-row game: average row 26.5 px down to 18.9 px (single-step rows 16 px), table height 4103 px down to 2940 px. The taller rows are cells where one player did several things in the same second.
+- Idea, not built: the player names at the top of the build table scroll under the sticky game bar. A sticky header row under the bar would keep them visible.
