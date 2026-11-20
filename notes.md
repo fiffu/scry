@@ -397,3 +397,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The nuke crosshair is a solid dim line (1 px, 35% opacity) in the player's colour, not dotted. The centre dot stays brighter (90%).
 
 - The nuke's dashed warning ring is in the player's colour too. The dim blast disc, the shockwave and the flash after landing stay red.
+
+- Removed the "nuke lands" label and the dashed targeting ring. The nuke now shows: the player-coloured crosshair while it counts down, then the shockwave, flash and dim blast disc on landing. The cast label (the skill's name) still shows when the nuke is ordered. Checked: the effect is still present at impact (150,652) and gone by +100 s (95).
