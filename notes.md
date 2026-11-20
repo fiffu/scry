@@ -403,3 +403,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The minimap legend no longer lists the fight stain; it reads "■ building ● unit ◆ skill ✕ destroyed ╌╌ movement".
 
 - Destroyed buildings and units fade in 25 s now (`QUICK_FADE_S`), the same as movement lines. They took 90 s. Skill diamonds and the nuke's blast disc still take 90 s (`FADE_S`). Checked: a destroyed turret's icon window goes 13,295 (+3 s), 9,588 (+12 s), 412 (+30 s). A destroyed unit goes 9,216 (+2 s), 7,685 (+12 s), 0 (+30 s).
+
+- The quick fade (movement lines and destroyed icons) is 12 s now, down from 25 s (`QUICK_FADE_S`). Checked: a destroyed turret goes 13,143 (+3 s), 9,755 (+6 s), 1,386 (+14 s). A destroyed unit goes 9,200, 7,453, 0. A finished move's path shows 6 s after arrival (ink 4) and is gone at 20 s.

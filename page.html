@@ -1213,7 +1213,7 @@ function drawTimeline(d, note) {
    The game logs a unit only when it has moved, about every 10.7 s (T_TICK). So when two known places are one tick apart the
    unit is drawn gliding between them, and when they are further apart it waits and then glides during the last tick.
    Between snapshots that glide is a straight-line estimate. */
-const MAP_W = 480, K = 1.3, FADE_S = 90, QUICK_FADE_S = 25, T_TICK = 10.7;   // K scales every symbol with the map size
+const MAP_W = 480, K = 1.3, FADE_S = 90, QUICK_FADE_S = 12, T_TICK = 10.7;   // K scales every symbol with the map size
 /* Area effects for a few skills, drawn once the skill is switched on. The radius (game units), the delay before it lands
    and how long it lasts come from the game's rules, NOT from the replay. They only change how it looks. */
 const EPIC = {
