@@ -1215,6 +1215,12 @@ function drawTimeline(d, note) {
    unit is drawn gliding between them, and when they are further apart it waits and then glides during the last tick.
    Between snapshots that glide is a straight-line estimate. */
 const MAP_W = 480, K = 1.3, FADE_S = 90, T_TICK = 10.7;   // K scales every symbol with the map size
+/* Area effects for a few skills, drawn once the skill is switched on. The radius (game units), the delay before it lands
+   and how long it lasts come from the game's rules, NOT from the replay. They only change how it looks. */
+const EPIC = {
+  TacticalNukeStrike: { radius: 8, delay: 14, colour: '#e5472f', kind: 'blast', lands: 'nuke lands' },
+  ScannerSweep: { radius: 13, delay: 0, lasts: 12.3, colour: '#3b9fd1', kind: 'area' },
+};
 const HALLS = new Set(['Nexus', 'CommandCenter', 'Hatchery', 'OrbitalCommand', 'PlanetaryFortress', 'Lair', 'Hive']);
 
 function buildMap(d) {
@@ -1307,12 +1313,29 @@ function makeMap(d) {
   function paint() {
     const t = mp.t;
     ctx.globalAlpha = 1; ctx.fillStyle = bg; ctx.fillRect(0, 0, m.w, m.h);
+    const on = new Set([...d.pick.keys()].map(k => k.slice(6)));   // skills switched on: shown as diamonds, fading out
+    const epics = [];
+    for (const c of d.casts) { const ep = EPIC[c.ability]; if (ep && c.x != null && on.has(c.ability) && t >= c.t) epics.push([c, ep]); }
     for (const f of m.fights) {                               // a fight: a pulsing ring, bigger for more value lost, fading after the last death
       if (t < f.t0 - 1 || t > f.t1 + 12) continue;
       const live = t <= f.t1, a = live ? 0.55 : 0.55 * (1 - (t - f.t1) / 12), r = (10 + Math.min(18, f.value / 450)) * K;
       const pulse = live ? 0.5 + 0.5 * Math.sin(t * 1.7) : 0;
       ctx.globalAlpha = a * 0.22; ctx.fillStyle = fgt; ctx.beginPath(); ctx.arc(sx(f.x), sy(f.y), r + pulse * 3, 0, 6.2832); ctx.fill();
       ctx.globalAlpha = a; ctx.strokeStyle = fgt; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx(f.x), sy(f.y), r + pulse * 3, 0, 6.2832); ctx.stroke();
+    }
+    for (const [c, ep] of epics) {                            // under the icons: the warning ring while it counts down, then the dim blast area
+      const x = sx(c.x), y = sy(c.y), Rr = ep.radius * m.scale, hit = c.t + ep.delay;
+      if (ep.kind === 'blast' && t < hit) {
+        ctx.globalAlpha = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(t * 3)); ctx.strokeStyle = ep.colour; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(x, y, Rr, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(x - Rr * 0.6, y); ctx.lineTo(x + Rr * 0.6, y); ctx.moveTo(x, y - Rr * 0.6); ctx.lineTo(x, y + Rr * 0.6); ctx.stroke();
+        continue;
+      }
+      const a = ep.kind === 'area' ? (t <= c.t + ep.lasts ? 1 : Math.max(0, 1 - (t - c.t - ep.lasts) / 6)) : fade(t - hit);
+      if (a <= 0) continue;
+      ctx.globalAlpha = 0.13 * a; ctx.fillStyle = ep.colour; ctx.beginPath(); ctx.arc(x, y, Rr, 0, 6.2832); ctx.fill();
+      if (ep.kind === 'blast') { ctx.globalAlpha = 0.2 * a; ctx.beginPath(); ctx.arc(x, y, Rr / 2, 0, 6.2832); ctx.fill(); }
+      ctx.globalAlpha = 0.4 * a; ctx.strokeStyle = ep.colour; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, Rr, 0, 6.2832); ctx.stroke();
     }
     const R = 3 * K, gone = [], lines = [], dots = [];
     for (const s of m.structs) {                              // buildings: a square, with an X inside once destroyed
@@ -1351,7 +1374,6 @@ function makeMap(d) {
     ctx.setLineDash([]);
     for (const [x, y, c] of dots) dot(x, y, R, c, 1, false);
     for (const [x, y, a, c] of gone) dot(x, y, R, c, a, true);   // destroyed: the same dot with an X inside, fading out
-    const on = new Set([...d.pick.keys()].map(k => k.slice(6)));   // skills: diamonds, only for the skills switched on, fading out
     if (on.size) {
       for (const c of d.casts) {
         if (c.x == null || c.t > t || !on.has(c.ability)) continue;
@@ -1361,10 +1383,29 @@ function makeMap(d) {
         diamond(x, y, r, colour.get(c.pid) || '#888', a);
       }
     }
+    const sw = Math.max(2, 0.6 * mp.speed);                   // a shockwave lasts about 0.6 s of real time
+    let flash = 0, flashColour = '#fff';
+    for (const [c, ep] of epics) {                            // a nuke lands: a shockwave and a brief flash
+      if (ep.kind !== 'blast') continue;
+      const age = t - (c.t + ep.delay);
+      if (age < 0 || age > sw) continue;
+      const k = age / sw;
+      ctx.globalAlpha = 0.8 * (1 - k); ctx.strokeStyle = ep.colour; ctx.lineWidth = 1 + 3 * (1 - k);
+      ctx.beginPath(); ctx.arc(sx(c.x), sy(c.y), ep.radius * m.scale * (0.6 + 2 * k), 0, 6.2832); ctx.stroke();
+      if (0.2 * (1 - k) > flash) { flash = 0.2 * (1 - k); flashColour = ep.colour; }   // in the skill's own colour: white would vanish on a light map
+    }
+    for (const s of m.structs) {                              // a base going down sends out a shockwave in its owner's colour
+      if (!HALLS.has(s.name) || s.t1 == null || t < s.t1 || t - s.t1 > sw) continue;
+      const k = (t - s.t1) / sw;
+      ctx.globalAlpha = 0.8 * (1 - k); ctx.strokeStyle = colour.get(s.pid) || '#888'; ctx.lineWidth = 1 + 3 * (1 - k);
+      ctx.beginPath(); ctx.arc(sx(s.x), sy(s.y), (6 + 26 * k) * K, 0, 6.2832); ctx.stroke();
+    }
+    if (flash > 0) { ctx.globalAlpha = flash; ctx.fillStyle = flashColour; ctx.fillRect(0, 0, m.w, m.h); }
     // pop-up labels. They last about 2.4 s of real time, so at a fast speed they last longer in replay time. At most 5 at once.
     const span = Math.max(6, 2.4 * mp.speed), labels = [];
     for (const e of m.pops) if (t >= e.t && t - e.t <= span) labels.push(e);
     for (const c of d.casts) if (c.x != null && c.t <= t && t - c.t <= span && on.has(c.ability)) labels.push({ t: c.t, x: c.x, y: c.y, text: c.ability, pid: c.pid });
+    for (const [c, ep] of epics) if (ep.lands && t >= c.t + ep.delay && t - c.t - ep.delay <= span) labels.push({ t: c.t + ep.delay, x: c.x, y: c.y, text: ep.lands, pid: c.pid });
     labels.sort((a, b) => b.t - a.t);
     ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif'; ctx.textBaseline = 'middle';
     const placed = [];

@@ -347,3 +347,18 @@ Not done or not verified: a legend entry for the labels, dark mode, a phone-size
 - Buildings are bigger (8 px, bases 13 px) so there is room for the X, and unit dots are 3.9 px.
 - The play and pause button keeps a fixed size (44 x 34 px). The two symbols have different widths, so it used to change size.
 - A unit's old dashed path no longer vanishes when the unit sets off again. The first version drew only the current move. Now every move that ended in the last 90 s is drawn and fades by its own age. Checked: with a unit travelling on to its next stop, the first path still shows at its midpoint (ink 4, against 0 once fully faded).
+
+## Epic indicators (2026-11-21)
+
+Effects on the minimap, drawn for a few skills once they are switched on in the Skills panel (same rule as the diamonds):
+- Nuke (`TacticalNukeStrike`): while it counts down (14 s), a pulsing dashed red ring with a crosshair at the target. On landing: an expanding shockwave ring, a brief red flash across the map (20% at most, about 0.6 s of real time), a "nuke lands" label, and a dim blast disc (outer radius 8 game units, a stronger core at half that) that fades over 90 s like the other symbols.
+- Scan (`ScannerSweep`): a dim blue disc (radius 13) for the 12.3 s a scan lasts, then it fades over 6 s.
+- A base going down sends a shockwave ring in its owner's colour. This needs no skill switched on.
+
+Honesty about the numbers: the replay records when a nuke was ORDERED, not when it lands. The 14 s countdown, the radii and the scan duration come from the game's rules, not from the replay. They sit in a small hand-kept table (`EPIC` in `page.html`) and only change how it looks. Add a skill by adding an entry.
+
+Checked with pixels (colour added around the spot, effect on minus effect off): warning ring at +5 s (169,062), dim blast disc at +45 s after landing (71,778), gone at +100 s (557); scan disc while scanning (95,893) and gone 40 s later (1,785); a destroyed base's shockwave (421,245 at +1 s against 360,785 at +14 s); the red flash shows (corner pixel 705 to 636). One of my own probes is invalid on the landing frame: it measures distance from the canvas corner pixel, and the flash tints that corner too, so the number comes out negative. The landing frame was judged by eye on a screenshot instead.
+
+A first flash in white did nothing on the light map, because the background is already near white. It is now the skill's own colour.
+
+Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are only 1.5 to 2.25 units, so about 3 px on this map), a mothership recall circle, making nukes show without switching them on, and a sound.
