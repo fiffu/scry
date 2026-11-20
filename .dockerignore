@@ -1,0 +1,10 @@
+.git
+.scry
+site
+dist
+shots
+spike
+*.SC2Replay
+_uimerge.py
+_info.txt
+__pycache__

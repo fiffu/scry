@@ -147,3 +147,20 @@ Things learned:
 - `store()` in Python had a bug: a changed file at an existing path hit the unique path constraint. Fixed in both writers: the old row at that path is removed first.
 - The `--bundle` one-file build is the server version. The static site needs the source folder (`page.html`, `worker.mjs`), so `--site` refuses to run from the one-file build.
 - Pyodide's Python is 3.14 and the laptop's is 3.10. The parser output was identical.
+
+## Docker build
+
+- `Dockerfile` has three stages. `build` (python:3.12-slim) installs `requirements.txt` and runs `scry.py --site /site`. `site` is a `scratch` stage that only holds the output. `serve` (nginx:1.27-alpine) is the default and serves the site on port 80.
+- `make image` builds the image, `make serve` runs it on 127.0.0.1:8000, and `make site` exports the static folder to `site/` with `docker build --target site --output site .`. None of these need Python on the laptop.
+- nginx 1.27's `mime.types` maps `.wasm` but not `.mjs`. A module script served with the wrong type is refused, so `nginx.conf` sets `text/javascript` for `.mjs`. It also turns on gzip for wasm, js and json.
+- `try_files $uri =404` returns 404 for `/`. It must be `try_files $uri $uri/ =404`.
+- Tested: the container run on 127.0.0.1 passes the same end-to-end test as the local site (same results, same saved database size of 704512 bytes). `/api/status` returns 404, which is how the page picks browser mode.
+- The exported `site/` equals the local build. Only `libs.zip` differs in bytes (zip timestamps). All 93 files inside it are identical.
+- Python in the Docker build image is 3.12, the laptop's is 3.10, Pyodide's is 3.14. Parser output was identical on 3.10 and 3.14, and the site built in the 3.12 image worked.
+- `.dockerignore` keeps replays, `.scry`, `site`, `dist`, `spike` and `_uimerge.py` out of the build context.
+
+## What still needs Python
+
+- At run time in the browser there is no Python install, but Python source still runs: `scry.py` and the `sc2reader` source (in `libs.zip`) are executed by Pyodide. So `scry.py` cannot be deleted.
+- At build time something must fetch the pinned packages, zip the `sc2reader` source and write `manifest.json`. `scry.py --site` does this inside Docker.
+- Only the server mode could be removed: `State`, `scan()`, `store()`, `build_tree()`, `make_handler()`, `bundle()`, `main()` serve and scan paths in `scry.py`, and the server branch in `page.html`.
