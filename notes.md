@@ -267,3 +267,20 @@ Game page:
 - "town hall" is now "base" in all visible text: "2 bases destroyed at 9:51, 12:17", "Both teams lost a base around 7:23" and the two tooltips. Code names (`TOWNHALLS`) are unchanged. The two build rules that name the command center are specific on purpose.
 - The game bar is one row: back button, heading, and the file chip and date at the right (`margin-left:auto`). It is 55 px tall (about 100 px before) and stays pinned. On a 900 px screen it wraps to two lines.
 - Fixed while testing: on narrow screens the build table made the whole page scroll sideways by 11 px. It now scrolls inside its own panel.
+
+## New replays: language, 1v1 and spam (2026-11-21)
+
+Eight new replays arrived (1v1, 2v2, builds 98310, 98370 and 98745). The first report: "no skills detected" and race `?` on `2026-11-18 - (Z)Arenhaet VS (T)zar`.
+
+Cause: that replay was recorded by a Russian-language game client. sc2reader's `play_race` is text in the client's language (`Зерги`, `Терраны`), so every comparison with `Zerg`, `Terran` or `Protoss` failed. The skills were found (the ability names are English: `SpawnLarva`, `SiegeMode`), but the Skills panel groups by race, found none, and showed nothing. The race badges showed `?`, the build rules and the first-production and first-tech timings did not run, and the matchup filter could not match the game.
+
+Fix: `canonical_race()` in `scry.py` resolves each player's race once, in this order: the metadata `AssignedRace` (`Terr`, `Prot`, `Zerg`, the same in every language), the type of the starting base born at frame 0, `pick_race` (English, but `Random` for random players), and `play_race` last. A unit test covers six cases, including random players and missing metadata. All stored races are now English. The browser matchup filter matches independent SQL counts on the 14-replay library (11, 6, 7 and 4 games).
+
+Related finds in the same replays:
+- The map name was English in both Russian-client replays. Map names could still be localised in other replays. Not verified.
+- The 2v2 `MEDOED` game had 20,456 `Gather` casts from three players. `Gather` (mining orders) is a generic order, not a skill. The skill filter now also drops `ScanMove`, `SetUnitRally`, anything ending in `Attack` (`BattlecruiserAttack` is an attack order) and anything starting with `Transform`, `Root` or `Uproot` (warp gate and crawler relocation). Casts went from 22,007 to 1,479 across the 14 games, and the database is 868 KB.
+- The skill filter is a hand-kept list. Every new patch or unit can add another generic order. Treat an odd skill in the list as a sign to extend `NOISE_EXACT`, `NOISE_PREFIX` or `NOISE_SUFFIX`.
+- The `MEDOED` game has no result at all (`winner` is `None` for every player), so it was not a clean finish. Cards and the game bar show no won or lost label for it. This is handled without errors.
+- A 198 s 2v2 on build 98370 triggered `cannon-rush` for one player. Checked by hand: a proxy pylon at 63 s, 173 units from their own base, a forge at 94 s, and cannons at 139 to 170 s that are 28 to 53 units from the enemy base. So the rule works on a real rush (first time it has seen one).
+- Newer builds (98370, 98745) parse without trouble. Pyodide and native Python give identical output on all 14 replays (Pyodide takes about 1.5x as long). The static site parsed the Russian-client replay and the `Gather` replay correctly.
+- 1v1 games: cards, game page, builds and the matchup widget all work. The matchup widget still shows two rows per side while the library holds 2v2 games.

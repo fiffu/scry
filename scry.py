@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 9  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 12  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -65,9 +65,10 @@ NOISE_EXACT = {
     'RightClick', 'Attack', 'Stop', 'HoldPosition', 'ReturnCargo', 'SetWorkerRally', 'Move', 'Patrol', 'Scan',
     'SmartCommand', 'RaiseSupplyDepot', 'LowerSupplyDepot', 'SetRallyPoint', 'SCVRepair', 'MULERepair',
     'HoldFireGhost', 'SalvageEffect', 'DecloakGhost',
+    'Gather', 'ScanMove', 'SetUnitRally',   # Gather: one player sent 20,000 of them in a single game
 }
 NOISE_PREFIX = ('Build', 'Train', 'Morph', 'Research', 'Upgrade', 'Evolve', 'Cancel', 'Lift', 'Land',
-                'WarpIn', 'Rally', 'Select', 'Load', 'Unload')
+                'WarpIn', 'Rally', 'Select', 'Load', 'Unload', 'Transform', 'Root', 'Uproot')
 
 # Words that get their own social tag when a player types them in chat (case does not matter).
 CHAT_WORDS = ('cyka', 'blyat')
@@ -80,6 +81,9 @@ JUNK_UNITS = {
 WORKERS = {'SCV', 'Probe', 'Drone'}
 NOT_ARMY = {'Overlord'}  # sc2reader calls it army. It is supply, so it must not count as the first army unit.
 TOWNHALLS = {'Nexus', 'CommandCenter', 'Hatchery'}
+RACES = ('Terran', 'Protoss', 'Zerg')
+START_RACE = {'Hatchery': 'Zerg', 'Nexus': 'Protoss', 'CommandCenter': 'Terran'}
+META_RACE = {'Terr': 'Terran', 'Prot': 'Protoss', 'Zerg': 'Zerg'}
 TOWNHALL_FORMS = TOWNHALLS | {'OrbitalCommand', 'PlanetaryFortress', 'Lair', 'Hive'}
 GAS = {'Refinery', 'Extractor', 'Assimilator'}
 PRODUCTION = {'Terran': 'Barracks', 'Protoss': 'Gateway', 'Zerg': 'SpawningPool'}
@@ -95,8 +99,11 @@ SHORT = {'SupplyDepot': 'Depot', 'Barracks': 'Rax', 'CommandCenter': 'CC', 'Refi
          'SporeCrawler': 'Spore', 'SpineCrawler': 'Spine', 'TwilightCouncil': 'Twilight'}
 
 
+NOISE_SUFFIX = ('Attack',)   # 'Attack', 'BattlecruiserAttack': an attack order, whatever unit gets it
+
+
 def is_skill(name):
-    return bool(name) and name not in NOISE_EXACT and not name.startswith(NOISE_PREFIX)
+    return bool(name) and name not in NOISE_EXACT and not name.startswith(NOISE_PREFIX) and not name.endswith(NOISE_SUFFIX)
 
 
 def is_cosmetic(name):
@@ -260,6 +267,20 @@ def classify_build(race, structs, units, own_start, enemy_starts):
     return label, extras, notation
 
 
+def canonical_race(p, meta_player, start_type):
+    """The race as an English name.
+
+    sc2reader's play_race is written in the language of the player's game client: a Russian replay says
+    'Зерги' and 'Терраны'. So it is the last resort. The metadata's AssignedRace and the player's starting
+    base are the same in every language. pick_race is English too, but says 'Random' for random players.
+    """
+    for guess in (META_RACE.get((meta_player or {}).get('AssignedRace')), START_RACE.get(start_type),
+                  getattr(p, 'pick_race', None), p.play_race):
+        if guess in RACES:
+            return guess
+    return p.play_race
+
+
 def parse_replay(path):
     """Parse one replay into a dict of rows. Raises on unreadable files."""
     import sc2reader
@@ -281,7 +302,7 @@ def parse_replay(path):
 
     stats = defaultdict(list)
     deaths, hall_deaths, structs, born, upgrades, morphs = [], [], defaultdict(list), defaultdict(list), [], []
-    starts = {}
+    starts, start_type = {}, {}
     for e in r.tracker_events:
         n = type(e).__name__
         if n == 'PlayerStatsEvent':
@@ -290,6 +311,7 @@ def parse_replay(path):
             u = e.unit
             if e.frame == 0 and e.unit_type_name in TOWNHALLS:
                 starts[e.control_pid] = (e.x, e.y)
+                start_type[e.control_pid] = e.unit_type_name
             elif u and u.is_army and u.name not in JUNK_UNITS and e.unit_type_name not in NOT_ARMY and (u.minerals or u.vespene):  # u.name is the LAST type: an overlord that became an overseer reports 'Overseer'
                 born[e.control_pid].append(dict(t=e.frame / FPS, name=e.unit_type_name))
         elif n == 'UnitInitEvent':
@@ -320,6 +342,8 @@ def parse_replay(path):
             if value > 0:
                 deaths.append(dict(t=e.frame / FPS, pid=u.owner.pid, team=team_of.get(u.owner.pid),
                                    value=value, name=u.name, x=e.x, y=e.y))
+
+    race_of = {p.pid: canonical_race(p, meta.get(p.pid), start_type.get(p.pid)) for p in players}
 
     actions = defaultdict(list)
     cmds = defaultdict(list)
@@ -384,14 +408,14 @@ def parse_replay(path):
         mmr = next((v for v in (getattr(p, 'init_data', {}).get('scaled_rating'), m.get('MMR')) if v and v > 0), None)
         apm_est[p.pid] = len(actions[p.pid]) / (dur / 60) if dur else 0
         player_rows.append((p.pid, keys[p.pid], p.name, getattr(p, 'clan_tag', '') or '', p.team.number,
-                            p.play_race, p.result or '', mmr, m.get('APM'), round(apm_est[p.pid], 1)))
+                            race_of[p.pid], p.result or '', mmr, m.get('APM'), round(apm_est[p.pid], 1)))
         buckets = Counter(int(f / FPS // 30) for f in actions[p.pid])
         apm_rows += [(p.pid, b, c) for b, c in sorted(buckets.items())]
 
     # ---- build steps and timings -------------------------------------------
     step_rows, timing_rows, builds = [], [], {}
     for p in players:
-        pid, race = p.pid, p.play_race
+        pid, race = p.pid, race_of[p.pid]
         s_list = sorted(structs[pid], key=lambda s: s['t'])
         for s in s_list:
             s['supply'] = supply_at(pid, s['t'])
