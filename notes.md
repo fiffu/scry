@@ -164,3 +164,22 @@ Things learned:
 - At run time in the browser there is no Python install, but Python source still runs: `scry.py` and the `sc2reader` source (in `libs.zip`) are executed by Pyodide. So `scry.py` cannot be deleted.
 - At build time something must fetch the pinned packages, zip the `sc2reader` source and write `manifest.json`. `scry.py --site` does this inside Docker.
 - Only the server mode could be removed: `State`, `scan()`, `store()`, `build_tree()`, `make_handler()`, `bundle()`, `main()` serve and scan paths in `scry.py`, and the server branch in `page.html`.
+
+## UI feedback round (user testing, 2026-11-21)
+
+Changes:
+- Welcome: no browser names. The line about not remembering the folder says "may not remember ... you may have to pick it again". Progress text never says Python: "Loading…" with a busy bar, "Loading N / N" with a filling bar, then "Loaded N new replay(s)".
+- Removed the high-APM and low-APM tags. Removed the APM text from cards. Parser version is now 4, so saved databases rebuild.
+- Cards: one column per team (team 1 left), players sorted by name without regard to case, a "won" or "lost" label per team. Each player has one colour everywhere (hue from a hash of the player id, so it never changes). Builds are pills next to the player. All pills apply their tag as a filter, and the click does not open the game.
+- Facets: "Shape of the game" and "Spectacle" are merged into "Game highlights" (the tag families in the database are unchanged). On hover the count turns into `+`, then `−` for an included tag and `×` for an excluded tag. Tooltips describe the tag. The descriptions live in `TAG_INFO` and `SKILL_INFO` in `page.html`. Their numbers repeat the thresholds in `CFG` in `scry.py`, so update both together.
+- Mode and matchup tags are gone. A matchup widget replaced them: each side has one row of P, T, Z buttons per player slot. The number of rows is the largest team size in the library. One side set means some team has those races. Both sides set means one team has the left races and a different team has the right races. Checked against independent SQL counts (5, 2 and 4 games).
+- The "tags must belong to the selected player" checkbox is renamed "Only count what the selected player did", has a tooltip, and shows only while a player is selected.
+- Timing ranges: names use the same style as the tag headings, the value range sits below the name, and a filled line joins the two handles.
+
+Bug found while testing: an excluded tag vanished from the facet list, because the counts only cover games that still match. Selected tags now stay in the list with a count of 0, so they can be cleared there.
+
+Limits and open points:
+- Mixed team sizes: the matchup rows follow the largest team size, so a library with 1v1 and 2v2 games shows 2 rows. There is no way to filter by team size alone. A 1v1 game can only match row 1 selections.
+- The matchup "one side set" case matches either team. It does not know which team is "left".
+- Card layout: "stacked horizontally" in the feedback was read as teams side by side, with players listed top to bottom inside a team.
+- Hover states were checked through computed styles of the pseudo-element. Appearance was checked only in light mode.

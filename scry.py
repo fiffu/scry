@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 3  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 4  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -52,7 +52,6 @@ CFG = dict(
     fast_third_s=200,
     second_rax_s=150,
     leaver_gap_s=60,
-    high_apm=200, low_apm=40,
     chat_after_s=60,
     fight_step=5, fight_win=4, fight_thresh=600, fight_merge=2, fight_min_total=800,
     opener_window_s=300,
@@ -109,7 +108,6 @@ SHORT = {'SupplyDepot': 'Depot', 'Barracks': 'Rax', 'CommandCenter': 'CC', 'Refi
          'Assimilator': 'Gas', 'Gateway': 'Gate', 'CyberneticsCore': 'Core', 'SpawningPool': 'Pool',
          'Hatchery': 'Hatch', 'EngineeringBay': 'Ebay', 'RoboticsFacility': 'Robo', 'PhotonCannon': 'Cannon',
          'SporeCrawler': 'Spore', 'SpineCrawler': 'Spine', 'TwilightCouncil': 'Twilight'}
-RACE_LETTER = {'Terran': 'T', 'Protoss': 'P', 'Zerg': 'Z'}
 
 
 def is_skill(name):
@@ -285,7 +283,6 @@ def parse_replay(path):
 
     players = list(r.players)
     team_of = {p.pid: p.team.number for p in players}
-    race_of = {p.pid: p.play_race for p in players}
     keys = {p.pid: player_key(p) for p in players}
 
     stats = defaultdict(list)
@@ -444,10 +441,7 @@ def parse_replay(path):
 
     # ---- tags ---------------------------------------------------------------
     tg = Tags()
-    comp = {tn: ''.join(sorted(RACE_LETTER.get(race_of[q], '?') for q in race_of if team_of[q] == tn)) for tn in teams}
     tg.add(None, 'map', r.map_name, 'exact', r.map_name)
-    tg.add(None, 'mode', r.type, 'exact', r.type)
-    tg.add(None, 'matchup', 'v'.join(sorted(comp.values())), 'exact', 'v'.join(sorted(comp.values())))
     if dur >= CFG['long_game_s']:
         tg.add(None, 'shape', 'long', 'inferred', 'long game', 'lasted %s' % mmss(dur))
     if dur < CFG['short_game_s']:
@@ -539,11 +533,6 @@ def parse_replay(path):
         if third is not None and third < CFG['fast_third_s']:
             tg.add(pid, 'econ', 'fast-third', 'inferred', 'fast third', 'third base started at %s' % mmss(third),
                    [(third, third)])
-        apm = meta.get(pid, {}).get('APM') or apm_est[pid]
-        if apm >= CFG['high_apm']:
-            tg.add(pid, 'people', 'high-apm', 'inferred', 'high APM', 'APM %d' % apm)
-        if apm < CFG['low_apm']:
-            tg.add(pid, 'people', 'low-apm', 'inferred', 'low APM', 'APM %d' % apm)
         lv = leaves.get(pid)
         if lv is not None and dur - lv >= CFG['leaver_gap_s']:
             tg.add(pid, 'people', 'leaver', 'inferred', 'left early',

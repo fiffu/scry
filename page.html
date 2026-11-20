@@ -3,8 +3,8 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>scry</title>
 <style>
-:root{--bg:#e8ebee;--panel:#f6f7f8;--line:#cdd2d7;--fg:#1d2328;--mut:#68727c;--acc:#0e6a68;--accbg:#d3ebe9;--warn:#a2331f;--ob:#6b3fa0;--obbg:#e7ddf4;--bar:#d6dbe0;--win:#2c7a3f;--loss:#a2331f;--sup:#3b7fb5;--fgt:#c0562f}
-@media (prefers-color-scheme:dark){:root{--bg:#1a1e22;--panel:#23282d;--line:#394046;--fg:#e4e8eb;--mut:#8e98a1;--acc:#52c3bd;--accbg:#1d3b3a;--warn:#ff8a73;--ob:#b794f0;--obbg:#31234b;--bar:#171b1f;--win:#6fd08a;--loss:#ff8a73;--sup:#6fb2e6;--fgt:#f08a5d}}
+:root{--bg:#e8ebee;--panel:#f6f7f8;--line:#cdd2d7;--fg:#1d2328;--mut:#68727c;--acc:#0e6a68;--accbg:#d3ebe9;--warn:#a2331f;--ob:#6b3fa0;--obbg:#e7ddf4;--bar:#d6dbe0;--win:#2c7a3f;--loss:#a2331f;--sup:#3b7fb5;--fgt:#c0562f;--pl:38%}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1e22;--panel:#23282d;--line:#394046;--fg:#e4e8eb;--mut:#8e98a1;--acc:#52c3bd;--accbg:#1d3b3a;--warn:#ff8a73;--ob:#b794f0;--obbg:#31234b;--bar:#171b1f;--win:#6fd08a;--loss:#ff8a73;--sup:#6fb2e6;--fgt:#f08a5d;--pl:68%}}
 *{box-sizing:border-box}[hidden]{display:none!important}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.35 ui-sans-serif,system-ui,"Segoe UI",sans-serif}
@@ -12,6 +12,7 @@ header{position:relative;display:flex;gap:10px;align-items:center;padding:10px 1
 header b{font-size:15px;margin-right:4px}
 #dir{flex:1;min-width:0;height:36px;cursor:pointer;font:13px ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
 #status,#prog{color:var(--mut);white-space:nowrap}
+#bar{width:110px;height:8px;accent-color:var(--acc)}
 #status.warn{color:var(--warn)}
 #tree{position:absolute;top:100%;left:14px;z-index:30;min-width:300px;max-width:calc(100vw - 28px);max-height:65vh;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004}
 .tn{display:flex;width:100%;justify-content:space-between;gap:14px;align-items:center;text-align:left;border:0;background:none;border-radius:4px;min-height:34px;font:13px ui-monospace,Menlo,Consolas,monospace}
@@ -38,6 +39,12 @@ aside h4:first-child{margin-top:0}
 .chip small{color:var(--mut);font-size:11px}
 .chip.flat{cursor:default}
 .chip.mine{border-color:var(--ob);background:var(--obbg)}
+.chip.sm{min-height:20px;padding:0 7px;font-size:11.5px}
+.chip:not(.flat):hover{border-color:var(--acc)}
+.fc:hover small{font-size:0}
+.fc:hover small::after{content:'+';font-size:15px;line-height:1;font-weight:700;color:var(--acc)}
+.fc.on:hover small::after{content:'\2212'}
+.fc.neg:hover small::after{content:'\00d7'}
 #sugg{position:absolute;z-index:20;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004;max-height:300px;overflow:auto}
 #sugg button{display:flex;width:100%;justify-content:space-between;border:0;border-radius:0;text-align:left}
 #sugg button.sel{background:var(--accbg)}
@@ -49,24 +56,31 @@ summary small{color:var(--mut);font-weight:400}
 .cond select,.cond input{width:100%;min-width:0}
 .cond .wide{grid-column:1/-1}
 .hist{margin:6px 0 10px}
-.hist .hl{display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
+.hist .hn{font-weight:600;font-size:13px;padding:4px 0 0}
+.hist .hr{font-size:12px;color:var(--mut);margin-bottom:2px}
 .hist canvas{display:block;width:100%;height:34px}
 .hist .rg{position:relative;height:20px}
-.hist input[type=range]{position:absolute;left:0;right:0;width:100%;margin:0;pointer-events:none;-webkit-appearance:none;background:none;height:20px}
-.hist input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--acc);border:2px solid var(--panel);cursor:pointer}
-.hist input[type=range]::-moz-range-thumb{pointer-events:auto;width:12px;height:12px;border-radius:50%;background:var(--acc);border:2px solid var(--panel);cursor:pointer}
-.hist input[type=range]::-webkit-slider-runnable-track{background:var(--line);height:3px;margin-top:0}
+.hist .rg .base{position:absolute;left:7px;right:7px;top:8.5px;height:3px;border-radius:2px;background:var(--line)}
+.hist .rg .fill{position:absolute;top:8px;height:4px;border-radius:2px;background:var(--acc)}
+.hist input[type=range]{position:absolute;left:0;right:0;width:100%;margin:0;pointer-events:none;-webkit-appearance:none;appearance:none;background:none;height:20px}
+.hist input[type=range]::-webkit-slider-thumb{box-sizing:border-box;pointer-events:auto;-webkit-appearance:none;width:14px;height:14px;margin-top:3px;border-radius:50%;background:var(--acc);border:2px solid var(--panel);cursor:pointer}
+.hist input[type=range]::-moz-range-thumb{box-sizing:border-box;pointer-events:auto;width:14px;height:14px;border-radius:50%;background:var(--acc);border:2px solid var(--panel);cursor:pointer}
+.hist input[type=range]::-webkit-slider-runnable-track{background:transparent;height:20px}
+.hist input[type=range]::-moz-range-track{background:transparent}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
 .card:hover{border-color:var(--acc)}
 .card .top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .card .top b{font-size:15px}
 .card .top span{color:var(--mut)}
 .card .when{margin-left:auto}
-.teams{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:8px 0}
-.pl{display:flex;gap:6px;align-items:center;min-width:0}
-.pl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pl .win{color:var(--win)}.pl .loss{color:var(--loss)}
-.pl small{color:var(--mut)}
+.teams{display:grid;margin:8px 0 10px}
+.team{min-width:0;padding:0 16px;display:flex;flex-direction:column;gap:3px}
+.team:first-child{padding-left:0}
+.team+.team{border-left:1px solid var(--line)}
+.th{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mut);margin-bottom:2px}
+.th .res{font-weight:600}.th .res.won{color:var(--win)}.th .res.lost{color:var(--loss)}
+.pl{display:flex;gap:6px;align-items:center;min-width:0;flex-wrap:wrap}
+.pl .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .race{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:4px;font:700 11px ui-monospace,monospace;color:#fff;flex:none}
 .race.T{background:#3f7cc0}.race.P{background:#b08d1f}.race.Z{background:#9a46b8}
 .err{color:var(--warn)}
@@ -89,6 +103,13 @@ th{color:var(--mut);font-weight:600;font-size:12px}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:6px;flex-wrap:wrap}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .mark{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+.mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.mu .side{display:flex;flex-direction:column;gap:4px}
+.mu .row3{display:flex;gap:3px}
+.mu button{flex:1;min-width:0;min-height:30px;padding:0;font:700 13px ui-monospace,Menlo,Consolas,monospace}
+.mu button.on{color:#fff;border-color:transparent}
+.mu button.P.on{background:#b08d1f}.mu button.T.on{background:#3f7cc0}.mu button.Z.on{background:#9a46b8}
+.mu .vs{color:var(--mut);font-size:12px}
 #lib.welcome{grid-template-columns:1fr}#lib.welcome aside{display:none}
 @media (max-width:900px){#lib{grid-template-columns:1fr;grid-auto-rows:auto;overflow-y:auto}aside{border-right:0;border-bottom:1px solid var(--line);max-height:60vh}}
 </style></head><body>
@@ -98,6 +119,7 @@ th{color:var(--mut);font-weight:600;font-size:12px}
  <button id="browse" aria-label="Browse folders">Folders ▾</button>
  <span id="status" role="status"></span>
  <button id="choose" hidden>Choose folder…</button>
+ <progress id="bar" hidden></progress>
  <span id="prog"></span>
  <button id="rescan" title="Look for new or changed replays">Rescan</button>
  <button id="exp" title="Download your notes as a file">Export notes</button>
@@ -118,7 +140,11 @@ th{color:var(--mut);font-weight:600;font-size:12px}
   <div class="chips" id="active"></div>
   <h4>Players</h4>
   <div class="chips" id="players"></div>
-  <label class="row" style="margin-top:6px;font-size:12.5px;color:var(--mut)"><input type="checkbox" id="scope" checked> tags must belong to the selected player</label>
+  <label class="row" id="scoperow" hidden style="margin-top:6px;font-size:12.5px;color:var(--mut)"
+    title="On: a tag such as Stim only counts if the selected player used it. Off: anyone in the game may have used it.">
+   <input type="checkbox" id="scope" checked> Only count what the selected player did</label>
+  <h4>Matchup</h4>
+  <div class="mu" id="matchup"></div>
   <h4>Build timing</h4>
   <div id="conds"></div>
   <button id="addcond">+ Add condition</button>
@@ -156,6 +182,86 @@ const ph = n => Array(n).fill('?').join(',');
 const likeEsc = s => s.replace(/[\\%_]/g, c => '\\' + c);
 const ftsq = s => '"' + s.replace(/"/g, '""') + '"';
 const RACE = { Terran: 'T', Protoss: 'P', Zerg: 'Z' };
+
+/* Each player keeps one colour everywhere. The hue comes from a hash of the player id, so it never changes. */
+function hashStr(s) { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; }
+const plColor = p => `hsl(${hashStr(p.toon && !String(p.toon).startsWith('name:') ? String(p.toon) : String(p.name || '')) % 360} 62% var(--pl))`;
+
+/* Short descriptions for tag tooltips. Numbers here repeat the thresholds in CFG in scry.py. */
+const TAG_INFO = {
+  'shape:stomp': 'One team lost at least three times as much value as the other.',
+  'shape:long': 'The game lasted 20 minutes or more.',
+  'shape:short': 'The game lasted under 10 minutes.',
+  'shape:slugfest': 'Eight or more separate fights.',
+  'shape:one-big-battle': 'Half or more of all the value lost in the game was lost in one fight.',
+  'shape:back-and-forth': 'The side losing the big fights changed several times.',
+  'spectacle:big-fight': 'A fight where 5,000 or more resources were lost.',
+  'spectacle:base-kill': 'A town hall was destroyed by the other team.',
+  'spectacle:base-trade': 'Both teams lost a town hall within 90 seconds of each other.',
+  'people:leaver': 'A player left more than a minute before the game ended.',
+  'people:chat': 'Players chatted after the first minute.',
+  'econ:maxed-out': 'A player reached 200 supply.',
+  'econ:floating-bank': 'A player held 5,000 or more unspent minerals for about a minute.',
+  'econ:fast-third': 'A player started a third base before 3:20.',
+  'build:12-pool': 'Zerg: spawning pool at about 12 supply, before any hatchery.',
+  'build:pool-first': 'Zerg: spawning pool before the first extra hatchery.',
+  'build:hatch-first': 'Zerg: extra hatchery before the spawning pool.',
+  'build:gas-first': 'Zerg: extractor before the hatchery and the pool.',
+  'build:3-hatch-before-pool': 'Zerg: a third hatchery before the spawning pool.',
+  'build:cc-first': 'Terran: command center before the first barracks.',
+  'build:2-rax-no-expand': 'Terran: two barracks early and no expansion yet.',
+  'build:reaper-expand': 'Terran: barracks, gas, a reaper, then expand.',
+  'build:rax-expand': 'Terran: barracks, then a second command center.',
+  'build:1-1-1': 'Terran: barracks, factory and starport on one base.',
+  'build:nexus-first': 'Protoss: nexus before the first gateway.',
+  'build:gate-expand': 'Protoss: gateway, then an expansion nexus.',
+  'build:forge-expand': 'Protoss: forge, then an expansion nexus.',
+  'build:forge-first': 'Protoss: forge before the first gateway.',
+  'build:2-gate': 'Protoss: two gateways before the cybernetics core, no early nexus.',
+  'build:cannon-rush': 'Protoss: forge and cannons built near the enemy base.',
+  'build:stargate-opener': 'Protoss: a stargate before 3:30.',
+  'build:robo-opener': 'Protoss: a robotics facility before 4:00.',
+  'build:unnamed': 'No known opening matched. Open the game to see the build order.',
+  'group:macro': 'Economy abilities: MULE, chrono boost, injects, extra supplies.',
+  'group:creep': 'Spreading creep with tumors.',
+  'group:detection': 'Revealing hidden units: scans, oracle revelation, changelings.',
+  'group:nuke': 'A ghost calling down a nuclear strike.',
+  'group:stim': 'Using stimpack.',
+  'group:spell': 'Spellcaster abilities such as storm, fungal, neural parasite, force field.',
+  'group:mode': 'Switching unit modes: siege, burrow, cloak, phasing.',
+  'group:boost': 'Speed boosts such as the medivac afterburners.',
+};
+const SKILL_INFO = {
+  CalldownMULE: 'Orbital command calls down a MULE to mine minerals.', ScannerSweep: 'Orbital command scans an area and reveals hidden units.',
+  TacticalNukeStrike: 'A ghost calls down a nuclear strike.', UseStimpack: 'Infantry trade health for faster attacks and movement.',
+  SiegeMode: 'A siege tank deploys into siege mode.', TankMode: 'A siege tank returns to tank mode.',
+  MedivacSpeedBoost: 'A medivac fires its afterburners.', CloakGhost: 'A ghost turns invisible.', ExtraSupplies: 'Orbital command drops extra supplies.',
+  BurrowWidowMine: 'A widow mine burrows.', KD8Charge: 'A reaper throws a KD8 charge.', EMPRound: 'A ghost fires an EMP.',
+  ChronoBoostEnergyCost: 'A nexus speeds up a building with chrono boost.', GravitonBeam: 'A phoenix lifts an enemy unit.',
+  OracleWeapon: 'An oracle turns on its pulsar beam.', ForceField: 'A sentry creates a force field.', PsionicStorm: 'A high templar casts psionic storm.',
+  PhasingMode: 'A warp prism switches to phasing mode.', TransportMode: 'A warp prism switches to transport mode.', HallucinatePhoenix: 'A sentry hallucinates a phoenix.',
+  SpawnLarva: 'A queen injects a hatchery with extra larva.', CreepTumor: 'Spreads creep with a creep tumor.', InfestorNeuralParasite: 'An infestor takes control of an enemy unit.',
+  BurrowInfestor: 'An infestor burrows.', QueenTransfusion: 'A queen heals a unit with transfusion.', HydraliskFrenzy: 'A hydralisk uses frenzy.',
+  FungalGrowth: 'An infestor casts fungal growth.', SpawnChangeling: 'An overseer spawns a changeling scout.', GenerateCreep: 'An overlord spreads creep.',
+  SpawnLocustsTargeted: 'A swarm host releases locusts.',
+};
+function describe(tag, label) {
+  if (TAG_INFO[tag]) return TAG_INFO[tag];
+  const [fam, ...rest] = tag.split(':'), name = rest.join(':');
+  if (fam === 'skill') return SKILL_INFO[name] || 'Used the ' + name + ' ability.';
+  if (fam === 'unit') return 'Built or trained a ' + name + '.';
+  if (fam === 'upgrade') return 'Finished the ' + name + ' upgrade.';
+  if (fam === 'map') return 'Played on ' + name + '.';
+  if (fam === 'mine') return 'Your own tag.';
+  return label || tag;
+}
+function toggleInclude(tag) {
+  const f = tagState(tag);
+  if (f && !f.neg) S.tags.splice(S.tags.indexOf(f), 1);
+  else if (f) f.neg = false;
+  else S.tags.push({ tag, neg: false });
+  refresh();
+}
 
 /* ------------------------------------------------------------------ database */
 let sqlite3, db = null, loadedVersion = -1, loadedAt = 0;
@@ -264,6 +370,7 @@ $('#impfile').onchange = async e => {
 const S = {
   folder: '', desc: true, shown: 60,
   tags: [], players: new Map(), scope: true, texts: [], conds: [], ranges: {},
+  mu: { a: [], b: [] },  // matchup: one list per side, one entry (null, 'P', 'T' or 'Z') per player slot
 };
 const THING_LABEL = {
   natural: 'Natural expansion started', third_base: 'Third base started', first_gas: 'First gas',
@@ -274,7 +381,40 @@ const RANGE_KEYS = [['natural', 'Natural expansion'], ['third_base', 'Third base
   ['first_army', 'First army unit'], ['duration', 'Game length']];
 
 function anyFilter() {
-  return S.tags.length || S.players.size || S.texts.length || S.conds.length || Object.keys(S.ranges).length;
+  return S.tags.length || S.players.size || S.texts.length || S.conds.length || Object.keys(S.ranges).length || muActive();
+}
+/* Matchup: each side lists the races it needs, one slot per player. One side set means "some team has these".
+   Both sides set means "one team has the left races and the other team has the right races". */
+const MU_NAME = { P: 'Protoss', T: 'Terran', Z: 'Zerg' };
+const muNeeds = side => { const c = { P: 0, T: 0, Z: 0 }; for (const r of side) if (r) c[r]++; return c; };
+const muHas = c => c.P + c.T + c.Z > 0;
+const muActive = () => S.mu.a.some(Boolean) || S.mu.b.some(Boolean);
+function muTeamPred(c, alias, p) {
+  return ['P', 'T', 'Z'].filter(k => c[k]).map(k => {
+    p.push(MU_NAME[k], c[k]);
+    return `(select count(*) from players px where px.rid=${alias}.rid and px.team=${alias}.team and px.race=?) >= ?`;
+  }).join(' and ');
+}
+function muLabel() {
+  const a = S.mu.a.filter(Boolean).join(''), b = S.mu.b.filter(Boolean).join('');
+  return a && b ? a + ' vs ' + b : 'a team with ' + (a || b);
+}
+function teamSize() {
+  const r = rows('select max(c) n from (select count(*) c from players group by rid, team)')[0];
+  return Math.max(1, (r && r.n) || 2);
+}
+function renderMatchup() {
+  const n = teamSize(), box = $('#matchup');
+  for (const k of ['a', 'b']) S.mu[k] = Array.from({ length: n }, (_, i) => S.mu[k][i] || null);
+  box.replaceChildren();
+  const side = k => h('div', { class: 'side' }, ...S.mu[k].map((cur, i) => h('div', { class: 'row3' },
+    ...Object.entries(MU_NAME).map(([L, name]) => {
+      const b = h('button', { class: L + (cur === L ? ' on' : ''), textContent: L, title: 'A ' + name + ' player on this side',
+        on: { click: () => { S.mu[k][i] = cur === L ? null : L; refresh(); } } });
+      b.dataset.side = k; b.dataset.row = i; b.dataset.race = L;
+      return b;
+    }))));
+  box.append(side('a'), h('span', { class: 'vs' }, 'vs'), side('b'));
 }
 function playerScope(alias) {
   return `${alias}.pid in (select q.pid from players q where q.rid=${alias}.rid and q.toon in (${ph(S.players.size)}))`;
@@ -304,6 +444,15 @@ function whereSql() {
     w.push(f.neg ? 'not ' + sql : sql);
   }
   if (S.players.size) { w.push(`exists (select 1 from players q where q.rid=r.rid and q.toon in (${ph(S.players.size)}))`); p.push(...S.players.keys()); }
+  if (muActive()) {
+    const A = muNeeds(S.mu.a), B = muNeeds(S.mu.b);
+    if (muHas(A) && muHas(B)) {
+      const pa = muTeamPred(A, 'a', p), pb = muTeamPred(B, 'b', p);
+      w.push(`exists (select 1 from players a join players b on b.rid=a.rid and b.team<>a.team where a.rid=r.rid and ${pa} and ${pb})`);
+    } else {
+      w.push(`exists (select 1 from players a where a.rid=r.rid and ${muTeamPred(muHas(A) ? A : B, 'a', p)})`);
+    }
+  }
   for (const t of S.texts) { w.push('r.rid in (select rid from fts_text where fts_text match ?)'); p.push(ftsq(t)); }
   const same = [];
   for (const c of S.conds) {
@@ -338,7 +487,7 @@ function refresh() {
   run('delete from sel');
   try { run(`insert into sel select r.rid from replays r ${where}`, params); }
   catch (e) { toast('Filter error: ' + e.message, true); console.error(e); return; }
-  renderActive(); renderPlayers(); renderFacets(); renderList(); renderConds();
+  renderActive(); renderPlayers(); renderMatchup(); renderFacets(); renderList(); renderConds();
   if (!$('#hists').childElementCount) renderHists();
 }
 
@@ -348,13 +497,14 @@ function renderActive() {
   const x = (label, cls, fn, title) => box.append(h('span', { class: 'chip ' + cls, title: title || '', on: { click: fn } }, label, h('small', {}, '✕')));
   S.tags.forEach((f, i) => x((f.neg ? 'NOT ' : '') + f.tag, f.neg ? 'neg' : 'on', () => { S.tags.splice(i, 1); refresh(); }, 'Remove'));
   S.texts.forEach((t, i) => x('text: ' + t, 'on', () => { S.texts.splice(i, 1); refresh(); }, 'Remove'));
+  if (muActive()) x('matchup: ' + muLabel(), 'on', () => { S.mu = { a: [], b: [] }; refresh(); }, 'Remove');
   for (const [k, [lo, hi]] of Object.entries(S.ranges)) {
     x((k === 'duration' ? 'length' : k) + ' ' + fmt(lo) + '–' + fmt(hi), 'on', () => { delete S.ranges[k]; $('#hists').replaceChildren(); refresh(); }, 'Remove');
   }
   if (!box.childElementCount) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'none'));
 }
 $('#clear').onclick = () => {
-  S.tags = []; S.texts = []; S.players.clear(); S.conds = []; S.ranges = {};
+  S.tags = []; S.texts = []; S.players.clear(); S.conds = []; S.ranges = {}; S.mu = { a: [], b: [] };
   $('#hists').replaceChildren(); refresh();
 };
 
@@ -370,17 +520,19 @@ function renderPlayers() {
     box.append(h('span', { class: 'chip' + (on ? ' on' : ''), title: r.toon, on: { click: () => {
       if (on) S.players.delete(r.toon); else S.players.set(r.toon, r.name);
       refresh();
-    } } }, r.name, h('small', {}, String(r.c))));
+    } } }, h('span', { style: 'color:' + plColor(r) + ';font-weight:600' }, r.name), h('small', {}, String(r.c))));
   }
   if (!list.length) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'no players'));
+  $('#scoperow').hidden = !S.players.size;
 }
 $('#scope').onchange = e => { S.scope = e.target.checked; refresh(); };
 
 /* ---- facets */
-const FAMS = [['mode', 'Mode'], ['map', 'Map'], ['matchup', 'Matchup'], ['build', 'Builds'], ['group', 'Skill groups'],
-  ['skill', 'Skills'], ['unit', 'Units'], ['upgrade', 'Upgrades'], ['shape', 'Shape of the game'],
-  ['spectacle', 'Spectacle'], ['econ', 'Economy'], ['people', 'People'], ['mine', 'Mine']];
-const openFams = new Set(['build', 'group', 'shape', 'spectacle']);
+const FAMS = [['map', 'Map', ['map']], ['build', 'Builds', ['build']], ['group', 'Skill groups', ['group']],
+  ['skill', 'Skills', ['skill']], ['unit', 'Units', ['unit']], ['upgrade', 'Upgrades', ['upgrade']],
+  ['highlights', 'Game highlights', ['shape', 'spectacle']], ['econ', 'Economy', ['econ']],
+  ['people', 'People', ['people']], ['mine', 'Mine', ['mine']]];
+const openFams = new Set(['build', 'group', 'highlights']);
 const famAll = new Set();
 function tagState(tag) { return S.tags.find(f => f.tag === tag); }
 function cycleTag(tag) {
@@ -396,8 +548,16 @@ function renderFacets() {
     where rid in (select rid from sel) group by family, tag, label order by c desc, label`);
   const by = {};
   for (const r of counts) (by[r.family] ||= []).push(r);
-  for (const [fam, title] of FAMS) {
-    const list = by[fam] || [];
+  // An excluded tag has no matching games left, so it would drop out of the list. Keep it, so it can be cleared.
+  for (const f of S.tags) {
+    const fam = f.tag.split(':')[0];
+    if (!(by[fam] || []).some(r => r.tag === f.tag)) {
+      const lab = (rows('select label from all_tags where tag=? limit 1', [f.tag])[0] || {}).label || f.tag;
+      (by[fam] ||= []).push({ family: fam, tag: f.tag, label: lab, c: 0 });
+    }
+  }
+  for (const [fam, title, srcs] of FAMS) {
+    const list = srcs.flatMap(f => by[f] || []).sort((x, y) => y.c - x.c || x.label.localeCompare(y.label));
     const d = h('details', { open: openFams.has(fam) });
     d.addEventListener('toggle', () => { d.open ? openFams.add(fam) : openFams.delete(fam); });
     d.append(h('summary', {}, title + ' ', h('small', {}, '(' + list.length + ')')));
@@ -405,8 +565,8 @@ function renderFacets() {
     const limit = famAll.has(fam) ? 1e9 : 14;
     for (const r of list.slice(0, limit)) {
       const st = tagState(r.tag);
-      chips.append(h('span', { class: 'chip' + (st ? (st.neg ? ' neg' : ' on') : '') + (fam === 'mine' ? ' mine' : ''),
-        title: r.tag + ' (click: include, again: exclude, again: clear)', on: { click: () => cycleTag(r.tag) } }, r.label, h('small', {}, String(r.c))));
+      chips.append(h('span', { class: 'chip fc' + (st ? (st.neg ? ' neg' : ' on') : '') + (fam === 'mine' ? ' mine' : ''),
+        title: describe(r.tag, r.label), on: { click: () => cycleTag(r.tag) } }, r.label, h('small', {}, String(r.c))));
     }
     if (list.length > limit) chips.append(h('span', { class: 'chip', on: { click: () => { famAll.add(fam); renderFacets(); } } }, '+' + (list.length - limit) + ' more'));
     d.append(chips);
@@ -523,6 +683,7 @@ function renderHists() {
     const cur = S.ranges[key] || [lo, hi];
     const cv = h('canvas', { width: 300, height: 34 });
     const label_ = h('span', {}, '');
+    const fillEl = h('div', { class: 'fill' });
     const a = h('input', { type: 'range', min: lo, max: hi, value: cur[0], step: 1 });
     const b = h('input', { type: 'range', min: lo, max: hi, value: cur[1], step: 1 });
     const draw = () => {
@@ -536,7 +697,10 @@ function renderHists() {
         x.fillStyle = v0 >= a1 - (hi - lo) / n && v0 <= b1 ? css.getPropertyValue('--acc') : css.getPropertyValue('--line');
         const hh = c / m * 32; x.fillRect(i * 12.5 + 1, 34 - hh, 10.5, hh);
       });
-      label_.textContent = fmt(a1) + ' – ' + fmt(b1) + (key === 'duration' ? '' : '');
+      label_.textContent = fmt(a1) + ' – ' + fmt(b1);
+      const fa = (a1 - lo) / (hi - lo), fb = (b1 - lo) / (hi - lo);   // 7px = half the handle width
+      fillEl.style.left = `calc(7px + (100% - 14px) * ${fa})`;
+      fillEl.style.width = `calc((100% - 14px) * ${fb - fa})`;
     };
     const upd = () => {
       let x = +a.value, y = +b.value;
@@ -546,7 +710,7 @@ function renderHists() {
     };
     a.oninput = b.oninput = upd;
     draw();
-    box.append(h('div', { class: 'hist' }, h('div', { class: 'hl' }, h('span', {}, label), label_), cv, h('div', { class: 'rg' }, a, b)));
+    box.append(h('div', { class: 'hist' }, h('div', { class: 'hn' }, label), h('div', { class: 'hr' }, label_), cv, h('div', { class: 'rg' }, h('div', { class: 'base' }), fillEl, a, b)));
   }
   if (!box.childElementCount) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'not enough data yet'));
 }
@@ -562,8 +726,8 @@ function renderList() {
   if (!total && MODE === 'browser' && !S.folder) {
     box.append(h('div', { class: 'panel', style: 'max-width:560px;margin:40px auto' }, h('h3', {}, 'Welcome'),
       h('p', {}, 'Choose the folder that holds your StarCraft II replays (.SC2Replay). Subfolders are included.'),
-      h('p', { style: 'color:var(--mut)' }, 'Replays are read and parsed in this browser. Nothing is uploaded.'),
-      window.showDirectoryPicker ? null : h('p', { style: 'color:var(--mut)' }, 'This browser cannot remember the folder, so you will pick it again each visit. Chrome or Edge can remember it.'),
+      h('p', { style: 'color:var(--mut)' }, 'Replays are read in this browser. Nothing is uploaded.'),
+      window.showDirectoryPicker ? null : h('p', { style: 'color:var(--mut)' }, 'This browser may not remember the folder, so you may have to pick it again on your next visit.'),
       h('button', { class: 'pri', on: { click: chooseFolder } }, 'Choose folder…')));
     return;
   }
@@ -576,7 +740,7 @@ function renderList() {
   const pls = {}, tgs = {};
   if (ids.length) {
     for (const p of rows(`select rid, pid, toon, name, team, race, result, apm_blizzard apm from players where rid in (${ph(ids.length)}) order by team, pid`, ids)) (pls[p.rid] ||= []).push(p);
-    for (const t of rows(`select rid, pid, tag, label, family from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','people')`, ids)) (tgs[t.rid] ||= []).push(t);
+    for (const t of rows(`select rid, pid, tag, label, family, evidence from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','people')`, ids)) (tgs[t.rid] ||= []).push(t);
   }
   box.append(h('div', { class: 'row', style: 'margin-bottom:8px;color:var(--mut)' }, 'Sorted by date, ',
     h('button', { style: 'min-height:24px', on: { click: () => { S.desc = !S.desc; renderList(); } } }, S.desc ? 'newest first' : 'oldest first')));
@@ -588,25 +752,38 @@ function renderList() {
     const mine = (notes[g.id] || {});
     const players = pls[g.rid] || [];
     const tagsOf = tgs[g.rid] || [];
-    const teamEls = players.map(p => {
-      const bl = tagsOf.filter(t => t.pid === p.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => t.label).join(', ');
-      return h('div', { class: 'pl' },
-        h('span', { class: 'race ' + (RACE[p.race] || '') }, RACE[p.race] || '?'),
-        h('span', { class: 'nm ' + (p.result === 'Win' ? 'win' : p.result === 'Loss' ? 'loss' : ''), title: p.name }, p.name),
-        h('small', {}, [p.apm ? Math.round(p.apm) + ' apm' : '', bl].filter(Boolean).join(' · ')));
+    // A pill applies its tag as a filter. stopPropagation keeps the click from opening the game.
+    const pill = (t, cls, text) => {
+      const st = tagState(t.tag);
+      return h('span', { class: 'chip' + (cls ? ' ' + cls : '') + (st && !st.neg ? ' on' : ''),
+        title: describe(t.tag, t.label) + (t.evidence ? ' (' + t.evidence + ')' : ''),
+        on: { click: e => { e.stopPropagation(); toggleInclude(t.tag); } } }, text || t.label);
+    };
+    const line = pl => h('div', { class: 'pl' },
+      h('span', { class: 'race ' + (RACE[pl.race] || '') }, RACE[pl.race] || '?'),
+      h('span', { class: 'nm', style: 'color:' + plColor(pl), title: pl.name }, pl.name),
+      ...tagsOf.filter(t => t.pid === pl.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => pill(t, 'sm')));
+    const byTeam = new Map();
+    for (const pl of players) (byTeam.get(pl.team) || byTeam.set(pl.team, []).get(pl.team)).push(pl);
+    const teamNums = [...byTeam.keys()].sort((x, y) => x - y);
+    const teamEls = teamNums.map(tn => {
+      const ps = byTeam.get(tn).slice().sort((x, y) => x.name.localeCompare(y.name, undefined, { sensitivity: 'base' }));
+      const res = ps[0].result === 'Win' ? 'won' : ps[0].result === 'Loss' ? 'lost' : '';
+      return h('div', { class: 'team' }, h('div', { class: 'th' }, 'Team ' + tn, res ? h('span', { class: 'res ' + res }, res) : null), ...ps.map(line));
     });
     const chipEls = [];
     for (const t of tagsOf) {
-      if (t.pid != null && !['people'].includes(t.family)) continue;  // per-player builds and economy show on the game page
-      if (t.family === 'people' && t.tag === 'people:chat') continue;
-      const who = t.pid != null ? (players.find(p => p.pid === t.pid) || {}).name : null;
-      chipEls.push(h('span', { class: 'chip flat' + (tagState(t.tag) ? ' on' : ''), title: (who ? who + ': ' : '') + t.tag }, (who ? who + ': ' : '') + t.label));
+      if (t.family === 'build') continue;                     // builds sit next to the player
+      if (t.pid != null && t.family !== 'people') continue;   // per-player economy shows on the game page
+      if (t.tag === 'people:chat') continue;
+      const who = t.pid != null ? (players.find(x => x.pid === t.pid) || {}).name : null;
+      chipEls.push(pill(t, '', (who ? who + ': ' : '') + t.label));
     }
     box.append(h('div', { class: 'card', on: { click: () => openGame(g.rid) } },
       h('div', { class: 'top' }, h('b', {}, g.map), h('span', {}, g.mode + ' · ' + fmt(g.duration_s)),
         notes[g.id] && (mine.text || (mine.tags || []).length || (mine.marks || []).length) ? h('span', { class: 'chip mine flat' }, 'notes') : null,
         h('span', { class: 'when' }, new Date(g.played_at).toLocaleString())),
-      h('div', { class: 'teams' }, ...teamEls),
+      h('div', { class: 'teams', style: 'grid-template-columns:repeat(' + Math.max(1, teamNums.length) + ',minmax(0,1fr))' }, ...teamEls),
       h('div', { class: 'chips' }, ...chipEls.slice(0, 18))));
   }
   if (n > games.length) box.append(h('button', { on: { click: () => { S.shown += 60; renderList(); } } }, 'Show more (' + (n - games.length) + ' left)'));
@@ -683,7 +860,7 @@ function renderGame() {
     const b = d.tags.find(t => t.pid === p.pid && t.family === 'build');
     const bl = d.tags.filter(t => t.pid === p.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => t.label).join(', ');
     pt.append(h('tr', {}, h('td', {}, h('span', { class: 'race ' + (RACE[p.race] || '') }, RACE[p.race] || '?')),
-      h('td', {}, p.name + (p.clan ? ' [' + p.clan + ']' : '')), h('td', {}, 'T' + p.team), h('td', {}, p.race),
+      h('td', { style: 'font-weight:600;color:' + plColor(p) }, p.name + (p.clan ? ' [' + p.clan + ']' : '')), h('td', {}, 'T' + p.team), h('td', {}, p.race),
       h('td', { class: p.result === 'Win' ? '' : '', style: 'color:' + (p.result === 'Win' ? 'var(--win)' : 'var(--loss)') }, p.result),
       h('td', {}, p.mmr || '–'), h('td', {}, p.apm_blizzard ? Math.round(p.apm_blizzard) : '~' + Math.round(p.apm_est)),
       h('td', { title: b ? b.evidence : '' }, bl || (b ? 'unnamed' : '–'))));
@@ -737,7 +914,7 @@ function renderGame() {
   const bo = h('div', { class: 'panel' }, h('h3', {}, 'Build orders'));
   const tw = h('div', { class: 'two' });
   for (const p of d.players) {
-    const col = h('div', {}, h('div', { style: 'font-weight:600' }, p.name + ' (' + p.race + ')'));
+    const col = h('div', {}, h('div', { style: 'font-weight:600;color:' + plColor(p) }, p.name + ' (' + p.race + ')'));
     const tm = d.timings.filter(t => t.pid === p.pid);
     if (tm.length) col.append(h('div', { class: 'chips', style: 'margin:4px 0' }, ...tm.map(t => h('span', { class: 'chip flat' }, (THING_LABEL[t.key] || t.key) + ' ' + fmt(t.t)))));
     const ln = h('div', { class: 'steps' });
@@ -811,7 +988,7 @@ function drawTimeline(d, note) {
   let ruler = `<rect x="${labW}" y="0" width="${plotW}" height="18" fill="var(--bar)" id="ruler"/>`;
   for (let t = 0; t <= dur; t += step) ruler += `<text x="${X(t) + 3}" y="13" font-size="11" fill="var(--mut)">${fmt(t)}</text><line x1="${X(t)}" x2="${X(t)}" y1="0" y2="@H@" stroke="var(--line)" stroke-width="1"/>`;
   for (const p of d.players) {
-    svg += `<text x="4" y="${y + 12}" font-size="12" font-weight="600" fill="var(--fg)">${esc(p.name.slice(0, 14))}</text><text x="4" y="${y + 26}" font-size="11" fill="var(--mut)">${esc(p.race)} · T${p.team} · ${esc(p.result)}</text>`;
+    svg += `<text x="4" y="${y + 12}" font-size="12" font-weight="600" fill="${plColor(p)}">${esc(p.name.slice(0, 14))}</text><text x="4" y="${y + 26}" font-size="11" fill="var(--mut)">${esc(p.race)} · T${p.team} · ${esc(p.result)}</text>`;
     const top = y;
     // apm lane
     for (const a of d.apm.filter(a => a.pid === p.pid)) {
@@ -925,7 +1102,7 @@ async function idbSet(key, value) {
 async function startBrowser() {
   $('#choose').hidden = false;
   try { manifest = await (await fetch('./manifest.json')).json(); }
-  catch { toast('manifest.json is missing. Build the site with: python scry.py --site DIR', true); return; }
+  catch { toast('This site is incomplete: manifest.json is missing.', true); return; }
   const saved = await idbGet('db');
   let next = null;
   if (saved && saved.parser_version === manifest.parser_version) {
@@ -1037,7 +1214,7 @@ function storeRec(sha, rel, size, mtimeMs, rec, error) {
 function spawnWorker() {
   return new Promise((res, rej) => {
     const w = new Worker('./worker.mjs', { type: 'module' });
-    w.onerror = e => rej(new Error('Python worker failed to start: ' + (e.message || 'see the console')));
+    w.onerror = e => rej(new Error('The replay reader failed to start: ' + (e.message || 'see the console')));
     w.onmessage = e => {
       if (e.data.type === 'ready') res(w);
       else if (e.data.type === 'fatal') rej(new Error(e.data.error));
@@ -1053,11 +1230,17 @@ const parseOn = (w, bytes) => new Promise((res, rej) => {
 async function scanBrowser() {
   if (bscanning) return;
   bscanning = true;
-  const prog = $('#prog'), say = t => { prog.textContent = t; };
+  const prog = $('#prog'), bar = $('#bar');
+  // frac: undefined = bar without a value (busy), a number = progress, null = no bar
+  const say = (t, frac) => {
+    prog.textContent = t;
+    bar.hidden = frac === null || t === '';
+    if (!bar.hidden) { if (frac === undefined) bar.removeAttribute('value'); else bar.value = frac; }
+  };
   const errors = [];
   let workers = [];
   try {
-    say('Looking for replays…');
+    say('Loading…');
     const files = await listFiles();
     const known = rows('select rid, id, path, size, mtime from replays');
     const byPath = new Map(known.map(k => [k.path, k])), byId = new Map(known.map(k => [k.id, k]));
@@ -1066,7 +1249,7 @@ async function scanBrowser() {
       const k = byPath.get(f.path);
       return !(k && k.size === f.file.size && Math.abs(k.mtime - f.file.lastModified / 1000) < 0.002);
     });
-    say('Reading ' + changed.length + ' file(s)…');
+    say('Loading…');
     for (const c of changed) c.sha = await sha256(await c.file.arrayBuffer());
 
     const vanished = new Map(known.filter(k => !onDisk.has(k.path)).map(k => [k.id, k]));
@@ -1092,7 +1275,7 @@ async function scanBrowser() {
     let next = 0, done = 0, lastUi = 0;
     if (total) {
       const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1, total));
-      say('Starting ' + n + ' Python worker(s)… (first start downloads about 13 MB)');
+      say('Loading…');
       workers = await Promise.all(Array.from({ length: n }, spawnWorker));
       const loop = async w => {
         while (next < todo.length) {
@@ -1102,7 +1285,7 @@ async function scanBrowser() {
           db.transaction(() => storeRec(job.sha, job.path, job.file.size, job.file.lastModified, out.rec || null, out.error || null));
           if (out.error) errors.push(job.path + ': ' + out.error);
           done++;
-          say('Parsing ' + done + '/' + total + '…');
+          say('Loading ' + done + ' / ' + total, done / total);
           if (Date.now() - lastUi > 1500) { lastUi = Date.now(); refresh(); }
         }
       };
@@ -1114,12 +1297,12 @@ async function scanBrowser() {
     syncNotes();
     refresh();
     await idbSet('db', { parser_version: manifest.parser_version, bytes: sqlite3.capi.sqlite3_js_db_export(db.pointer) });
-    say(total ? 'Parsed ' + total + ' new replay(s)' : 'Up to date');
+    say(total ? 'Loaded ' + total + ' new replay(s)' : 'Up to date', null);
     if (errors.length) console.warn(errors.join('\n'));
   } catch (e) {
     try { run('rollback'); } catch { /* no open transaction */ }
     toast(e.message, true); console.error(e);
-    say('');
+    say('', null);
   } finally {
     for (const w of workers) w.terminate();  // frees the memory each Python runtime holds
     bscanning = false;
