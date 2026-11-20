@@ -399,3 +399,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The nuke's dashed warning ring is in the player's colour too. The dim blast disc, the shockwave and the flash after landing stay red.
 
 - Removed the "nuke lands" label and the dashed targeting ring. The nuke now shows: the player-coloured crosshair while it counts down, then the shockwave, flash and dim blast disc on landing. The cast label (the skill's name) still shows when the nuke is ordered. Checked: the effect is still present at impact (150,652) and gone by +100 s (95).
+
+- The minimap legend no longer lists the fight stain; it reads "■ building ● unit ◆ skill ✕ destroyed ╌╌ movement".

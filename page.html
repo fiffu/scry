@@ -1283,7 +1283,7 @@ function makeMap(d) {
   const hud = h('div', { class: 'hud' }, ...hudRows.map(r => r.row));
   const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
   col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),
-    h('div', { class: 'subt', style: 'margin:6px 0 0', title: 'Between two position snapshots a unit moves in a straight line. That is an estimate.' }, '■ building   ● unit   ◆ skill   ✕ destroyed   ╌╌ movement   ', h('span', { style: 'color:#b01c22' }, '▓'), ' fight'),
+    h('div', { class: 'subt', style: 'margin:6px 0 0', title: 'Between two position snapshots a unit moves in a straight line. That is an estimate.' }, '■ building   ● unit   ◆ skill   ✕ destroyed   ╌╌ movement'),
     hud);
 
   const css = getComputedStyle(document.documentElement);     // a canvas cannot use CSS variables, so read their values here
