@@ -651,6 +651,9 @@ def delete_replay(con, sha):
 
 def store(con, sha, rel, size, mtime, rec, error):
     delete_replay(con, sha)
+    old = con.execute('select id from replays where path=?', (rel,)).fetchone()
+    if old:  # the file at this path changed: drop the old row, path is unique
+        delete_replay(con, old[0])
     if rec is None:
         iso = time.strftime('%Y-%m-%dT%H:%M:%S+00:00', time.gmtime(mtime))
         con.execute('insert into replays(id,path,size,mtime,played_at,error) values(?,?,?,?,?,?)',
