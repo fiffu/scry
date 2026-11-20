@@ -386,3 +386,6 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - Orbital scans are not plotted: a scan is a different skill (ScannerSweep) and has its own blue disc once switched on. The orbital command's own scan cast is the same ScannerSweep, so it is already covered.
 
 - The timeline's fight bands are the same dark red as the map stain now, with a gradient that is stronger in the middle and soft at the ends (it was a flat orange at 12%). The loss bars stay orange, so they still stand out against the red. Checked in a screenshot: all 14 fights in the test game are red bands.
+
+- No gradient on the timeline: fight bands are a flat dark red (#8c1419 at 50%). The minimap stain is a flat dark red disc with a short fade at its rim (flat to 82% of the radius, then it fades out). Checked in screenshots.
+- The APM line, its dots and its legend swatch are white now (they were teal).
