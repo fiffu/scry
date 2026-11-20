@@ -1283,13 +1283,13 @@ function makeMap(d) {
   const hud = h('div', { class: 'hud' }, ...hudRows.map(r => r.row));
   const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
   col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),
-    h('div', { class: 'subt', style: 'margin:6px 0 0', title: 'Between two position snapshots a unit moves in a straight line. That is an estimate.' }, '■ building   ● unit   ◆ skill   ✕ destroyed   ╌╌ movement   ◯ fight'),
+    h('div', { class: 'subt', style: 'margin:6px 0 0', title: 'Between two position snapshots a unit moves in a straight line. That is an estimate.' }, '■ building   ● unit   ◆ skill   ✕ destroyed   ╌╌ movement   ', h('span', { style: 'color:#b01c22' }, '▓'), ' fight'),
     hud);
 
   const css = getComputedStyle(document.documentElement);     // a canvas cannot use CSS variables, so read their values here
   const light = css.getPropertyValue('--pl').trim() || '68%', bg = css.getPropertyValue('--bg').trim() || '#1a1e22';
   const colour = new Map(d.players.map(pl => [pl.pid, `hsl(${plHue(pl)}, 62%, ${light})`]));
-  const fgt = css.getPropertyValue('--fgt').trim() || '#c0562f', ob = css.getPropertyValue('--ob').trim() || '#6b3fa0';
+  const ob = css.getPropertyValue('--ob').trim() || '#6b3fa0';
   const sx = x => (x - m.x0) * m.scale, sy = y => m.h - (y - m.y0) * m.scale;   // the game's y axis points up
   const fade = age => Math.max(0, 1 - age / FADE_S);   // 1 when new, 0 after FADE_S seconds of replay time
 
@@ -1322,12 +1322,12 @@ function makeMap(d) {
     const on = new Set([...d.pick.keys()].map(k => k.slice(6)));   // skills switched on: shown as diamonds, fading out
     const epics = [];
     for (const c of d.casts) { const ep = EPIC[c.ability]; if (ep && c.x != null && on.has(c.ability) && t >= c.t) epics.push([c, ep]); }
-    for (const f of m.fights) {                               // a fight: a pulsing ring, bigger for more value lost, fading after the last death
+    for (const f of m.fights) {                               // a fight: a dark red stain under everything, bigger for more value lost, fading after the last death
       if (t < f.t0 - 1 || t > f.t1 + 12) continue;
-      const live = t <= f.t1, a = live ? 0.55 : 0.55 * (1 - (t - f.t1) / 12), r = (10 + Math.min(18, f.value / 450)) * K;
-      const pulse = live ? 0.5 + 0.5 * Math.sin(t * 1.7) : 0;
-      ctx.globalAlpha = a * 0.22; ctx.fillStyle = fgt; ctx.beginPath(); ctx.arc(sx(f.x), sy(f.y), r + pulse * 3, 0, 6.2832); ctx.fill();
-      ctx.globalAlpha = a; ctx.strokeStyle = fgt; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(sx(f.x), sy(f.y), r + pulse * 3, 0, 6.2832); ctx.stroke();
+      const live = t <= f.t1, a = live ? 1 : 1 - (t - f.t1) / 12, r = (12 + Math.min(20, f.value / 400)) * K, x = sx(f.x), y = sy(f.y);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(176,28,34,0.62)'); g.addColorStop(0.55, 'rgba(150,24,30,0.38)'); g.addColorStop(1, 'rgba(120,20,26,0)');
+      ctx.globalAlpha = a; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
     }
     for (const [c, ep] of epics) {                            // under the icons: the warning ring while it counts down, then the dim blast area
       const x = sx(c.x), y = sy(c.y), Rr = ep.radius * m.scale, hit = c.t + ep.delay;
