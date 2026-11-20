@@ -609,6 +609,12 @@ create index i_steps on build_steps(name, nth, t);
 create index i_timings on timings(key, t);
 create index i_players on players(toon);
 '''
+# How a parsed record maps onto tables: (table, key in the record, columns after rid).
+# The browser backend reads this from manifest.json, so both writers share one layout.
+REC_TABLES = (('players', 'players', 10), ('stats', 'stats', 12), ('casts', 'casts', 4),
+              ('build_steps', 'steps', 7), ('timings', 'timings', 3), ('fights', 'fights', 5),
+              ('fight_losses', 'losses', 4), ('apm', 'apm', 3), ('chat', 'chat', 4))
+REPLAY_FIELDS = ('map', 'mode', 'category', 'build', 'played_at', 'duration_s', 'winner_team')
 CHILD_TABLES = ('players', 'tags', 'casts', 'build_steps', 'timings', 'fights', 'fight_losses', 'stats', 'apm', 'chat')
 
 
@@ -651,23 +657,15 @@ def store(con, sha, rel, size, mtime, rec, error):
                     (sha, rel, size, mtime, iso, error))
         return
     R = rec['replay']
-    rid = con.execute('insert into replays(id,fingerprint,path,size,mtime,map,mode,category,build,played_at,'
-                      'duration_s,winner_team) values(?,?,?,?,?,?,?,?,?,?,?,?)',
-                      (sha, R['fingerprint'], rel, size, mtime, R['map'], R['mode'], R['category'], R['build'],
-                       R['played_at'], R['duration_s'], R['winner_team'])).lastrowid
+    rid = con.execute('insert into replays(id,fingerprint,path,size,mtime,%s) values(?,?,?,?,?%s)' % (
+        ','.join(REPLAY_FIELDS), ',?' * len(REPLAY_FIELDS)),
+        (sha, R['fingerprint'], rel, size, mtime) + tuple(R[f] for f in REPLAY_FIELDS)).lastrowid
 
     def many(table, rows, width):
         if rows:
             con.executemany('insert into %s values(?%s)' % (table, ',?' * width), [(rid,) + tuple(r) for r in rows])
-    many('players', rec['players'], 10)
-    many('stats', rec['stats'], 12)
-    many('casts', rec['casts'], 4)
-    many('build_steps', rec['steps'], 7)
-    many('timings', rec['timings'], 3)
-    many('fights', rec['fights'], 5)
-    many('fight_losses', rec['losses'], 4)
-    many('apm', rec['apm'], 3)
-    many('chat', rec['chat'], 4)
+    for table, key, width in REC_TABLES:
+        many(table, rec[key], width)
     tid = con.execute('select coalesce(max(tid), 0) from tags').fetchone()[0]
     tid_of, tag_rows = {}, []
     for pid, family, tag, kind, label, evidence in rec['tags']:
@@ -786,34 +784,84 @@ VENDOR = dict(
     files={'index.mjs': 'package/dist/index.mjs', 'sqlite3.wasm': 'package/dist/sqlite3.wasm'},
 )
 VENDOR_MIME = {'index.mjs': 'text/javascript; charset=utf-8', 'sqlite3.wasm': 'application/wasm'}
+# Only needed by the static site (--site): Python in the browser.
+PYODIDE = dict(
+    version='314.0.8',
+    url='https://registry.npmjs.org/pyodide/-/pyodide-314.0.8.tgz',
+    integrity='sha512-74Wq1kXOC+CCEzAfxuRAO701nAcCMLjf8NrwvWpu8S41dVMXwXmLQ05dYB+F4e46AdnGo0oq7YHSVUpHsoarLQ==',
+    files={n: 'package/' + n for n in ('pyodide.mjs', 'pyodide.asm.mjs', 'pyodide.asm.wasm',
+                                      'python_stdlib.zip', 'pyodide-lock.json')},
+)
 
 
-def ensure_vendor(vdir):
-    """Download sqlite-wasm once. Returns True when both files are present."""
-    if all(os.path.isfile(os.path.join(vdir, n)) for n in VENDOR['files']):
+def fetch_pkg(spec, dest, what):
+    """Download an npm tarball once, check its pinned sha512, and extract the listed files into dest."""
+    if all(os.path.isfile(os.path.join(dest, n)) for n in spec['files']):
         return True
     import base64
     import io
     import tarfile
     import urllib.request
-    print('First run: downloading sqlite-wasm (about 1 MB, one time)...')
+    print('Downloading %s (one time)...' % what)
     try:
-        req = urllib.request.Request(VENDOR['url'], headers={'User-Agent': 'scry'})
-        data = urllib.request.urlopen(req, timeout=60).read()
+        req = urllib.request.Request(spec['url'], headers={'User-Agent': 'scry'})
+        data = urllib.request.urlopen(req, timeout=120).read()
     except Exception as ex:
         print('Download failed: %s' % ex)
-        print('Place index.mjs and sqlite3.wasm from @sqlite.org/sqlite-wasm 3.54.1-build1 (dist folder) in %s' % vdir)
+        print('Fetch %s and place these files in %s: %s' % (spec['url'], dest, ', '.join(spec['files'])))
         return False
     digest = 'sha512-' + base64.b64encode(hashlib.sha512(data).digest()).decode()
-    if digest != VENDOR['integrity']:
+    if digest != spec['integrity']:
         print('Downloaded file does not match the pinned hash. Not using it.')
         return False
-    os.makedirs(vdir, exist_ok=True)
+    os.makedirs(dest, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tf:
-        for name, member in VENDOR['files'].items():
-            with open(os.path.join(vdir, name), 'wb') as f:
+        for name, member in spec['files'].items():
+            with open(os.path.join(dest, name), 'wb') as f:
                 f.write(tf.extractfile(member).read())
     return True
+
+
+def ensure_vendor(vdir):
+    """sqlite-wasm for the page. Returns True when both files are present."""
+    return fetch_pkg(VENDOR, vdir, 'sqlite-wasm, about 1 MB')
+
+
+def build_site(out):
+    """Write a static site: the same page, with Python (Pyodide) in the browser instead of this server."""
+    import zipfile
+    here = os.path.dirname(os.path.realpath(__file__))
+    for need in ('page.html', 'worker.mjs'):
+        if not os.path.isfile(os.path.join(here, need)):
+            sys.exit('--site needs %s next to scry.py (run it from the source folder, not the one-file build)' % need)
+    try:
+        import sc2reader
+        import mpyq
+    except ImportError:
+        sys.exit('--site needs sc2reader installed (pip install sc2reader): its source goes into libs.zip')
+    out = os.path.abspath(out)
+    os.makedirs(os.path.join(out, 'vendor', 'pyodide'), exist_ok=True)
+    if not (ensure_vendor(os.path.join(out, 'vendor')) and
+            fetch_pkg(PYODIDE, os.path.join(out, 'vendor', 'pyodide'), 'Pyodide %s, about 6 MB' % PYODIDE['version'])):
+        sys.exit(1)
+    with zipfile.ZipFile(os.path.join(out, 'libs.zip'), 'w', zipfile.ZIP_DEFLATED) as z:
+        pkg = os.path.dirname(sc2reader.__file__)
+        for dirpath, dirnames, filenames in os.walk(pkg):
+            dirnames[:] = [d for d in dirnames if d != '__pycache__']
+            for fn in filenames:
+                if not fn.endswith('.pyc'):
+                    full = os.path.join(dirpath, fn)
+                    z.write(full, os.path.join('sc2reader', os.path.relpath(full, pkg)))
+        z.write(mpyq.__file__, 'mpyq.py')
+    for src, dst in (('page.html', 'index.html'), ('worker.mjs', 'worker.mjs'), ('scry.py', 'scry.py')):
+        with open(os.path.join(here, src), 'rb') as f, open(os.path.join(out, dst), 'wb') as g:
+            g.write(f.read())
+    with open(os.path.join(out, 'manifest.json'), 'w', encoding='utf8') as f:
+        json.dump(dict(parser_version=PARSER_VERSION, schema=SCHEMA, rec_tables=REC_TABLES,
+                       replay_fields=REPLAY_FIELDS, pyodide=PYODIDE['version'],
+                       sc2reader=getattr(sc2reader, '__version__', '')), f)
+    print('Wrote static site to %s' % out)
+    print('Serve it over HTTP, for example: python3 -m http.server --bind 127.0.0.1 -d %s' % out)
 
 
 # ----------------------------------------------------------------------------
@@ -956,9 +1004,12 @@ def main():
     ap.add_argument('--no-scan', action='store_true', help='serve the existing database without scanning')
     ap.add_argument('--open', action='store_true', help='open the page in the default browser')
     ap.add_argument('--bundle', metavar='FILE', help='write a single-file copy of this tool and exit')
+    ap.add_argument('--site', metavar='DIR', help='write a static site that runs without this server, then exit')
     args = ap.parse_args()
     if args.bundle:
         return bundle(args.bundle)
+    if args.site:
+        return build_site(args.site)
 
     root = os.path.realpath(args.root)
     if not os.path.isdir(root):
