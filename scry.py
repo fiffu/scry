@@ -771,21 +771,212 @@ def scan(state, workers=None):
         state.version += 1
 
 
-# ---- server and page are added below ----
+# ----------------------------------------------------------------------------
+# Browser SQLite (sqlite-wasm), fetched once and checked against a pinned hash
+# ----------------------------------------------------------------------------
+
+VENDOR = dict(
+    url='https://registry.npmjs.org/@sqlite.org/sqlite-wasm/-/sqlite-wasm-3.54.1-build1.tgz',
+    integrity='sha512-foW427VBLJ3G87bsnvQTZCc9zYe0Fq1wH0pz1I6BlKLKXcArIAyTkHtq0iT2llmhcMQt9T/p6l5PpQQh+6O8uQ==',
+    files={'index.mjs': 'package/dist/index.mjs', 'sqlite3.wasm': 'package/dist/sqlite3.wasm'},
+)
+VENDOR_MIME = {'index.mjs': 'text/javascript; charset=utf-8', 'sqlite3.wasm': 'application/wasm'}
+
+
+def ensure_vendor(vdir):
+    """Download sqlite-wasm once. Returns True when both files are present."""
+    if all(os.path.isfile(os.path.join(vdir, n)) for n in VENDOR['files']):
+        return True
+    import base64
+    import io
+    import tarfile
+    import urllib.request
+    print('First run: downloading sqlite-wasm (about 1 MB, one time)...')
+    try:
+        req = urllib.request.Request(VENDOR['url'], headers={'User-Agent': 'scry'})
+        data = urllib.request.urlopen(req, timeout=60).read()
+    except Exception as ex:
+        print('Download failed: %s' % ex)
+        print('Place index.mjs and sqlite3.wasm from @sqlite.org/sqlite-wasm 3.54.1-build1 (dist folder) in %s' % vdir)
+        return False
+    digest = 'sha512-' + base64.b64encode(hashlib.sha512(data).digest()).decode()
+    if digest != VENDOR['integrity']:
+        print('Downloaded file does not match the pinned hash. Not using it.')
+        return False
+    os.makedirs(vdir, exist_ok=True)
+    with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as tf:
+        for name, member in VENDOR['files'].items():
+            with open(os.path.join(vdir, name), 'wb') as f:
+                f.write(tf.extractfile(member).read())
+    return True
+
+
+# ----------------------------------------------------------------------------
+# HTTP
+# ----------------------------------------------------------------------------
+
+PAGE_EMBEDDED = None  # @@PAGE@@ (make bundle replaces this line with the page)
+
+
+def load_page():
+    if PAGE_EMBEDDED is not None:
+        return PAGE_EMBEDDED
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'page.html')
+    with open(path, 'r', encoding='utf8') as f:
+        return f.read()
+
+
+def build_tree(state):
+    """Folders under the root, pruned to folders that (transitively) hold replays."""
+    with state.lock:
+        con = sqlite3.connect(state.db_path)
+        paths = [r[0] for r in con.execute('select path from replays')]
+        con.close()
+    root = {'name': os.path.basename(state.root) or state.root, 'rel': '', 'n': 0, 'total': 0, 'kids': {}}
+    for p in paths:
+        parts = p.split('/')
+        node = root
+        node['total'] += 1
+        for i, part in enumerate(parts[:-1]):
+            node = node['kids'].setdefault(part, {'name': part, 'rel': '/'.join(parts[:i + 1]), 'n': 0, 'total': 0, 'kids': {}})
+            node['total'] += 1
+        node['n'] += 1
+
+    def fin(n):
+        n['kids'] = [fin(k) for k in sorted(n['kids'].values(), key=lambda k: k['name'].lower())]
+        return n
+    return fin(root)
+
+
+def make_handler(state, vdir, rescan):
+    import gzip
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def _send(self, code, body, ctype, headers=None):
+            self.send_response(code)
+            self.send_header('Content-Type', ctype)
+            self.send_header('Content-Length', str(len(body)))
+            for k, v in (headers or {}).items():
+                self.send_header(k, v)
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _json(self, obj):
+            self._send(200, json.dumps(obj).encode(), 'application/json', {'Cache-Control': 'no-store'})
+
+        def _handle(self, post):
+            u = urlparse(self.path)
+            try:
+                if u.path == '/' and not post:
+                    return self._send(200, load_page().encode('utf8'), 'text/html; charset=utf-8', {'Cache-Control': 'no-store'})
+                if u.path.startswith('/vendor/'):
+                    name = u.path[len('/vendor/'):]
+                    if name not in VENDOR_MIME:
+                        return self._send(404, b'Not found', 'text/plain')
+                    with open(os.path.join(vdir, name), 'rb') as f:
+                        return self._send(200, f.read(), VENDOR_MIME[name], {'Cache-Control': 'max-age=86400'})
+                if u.path == '/db':
+                    return self._db()
+                if u.path == '/api/tree':
+                    t = build_tree(state)
+                    t['abs'] = state.root
+                    return self._json(t)
+                if u.path == '/api/status':
+                    return self._json({'scanning': state.scanning, 'done': state.done, 'total': state.total,
+                                       'version': state.version, 'message': state.message,
+                                       'errors': state.errors[-20:], 'root': state.root})
+                if u.path == '/api/rescan' and post:
+                    rescan()
+                    return self._json({'ok': True})
+                if u.path == '/favicon.ico':
+                    return self._send(204, b'', 'image/x-icon')
+                self._send(404, b'Not found', 'text/plain')
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+            except Exception as ex:
+                self._send(500, ('Server error: %s' % ex).encode('utf8'), 'text/plain; charset=utf-8')
+
+        def _db(self):
+            etag_in = self.headers.get('If-None-Match')
+            with state.lock:
+                v = state.version
+                etag = '"v%d"' % v
+                if etag_in == etag:
+                    return self._send(304, b'', 'application/octet-stream', {'ETag': etag})
+                gz = getattr(state, 'gz', None)
+                wants_gzip = 'gzip' in (self.headers.get('Accept-Encoding') or '')
+                if gz is None or gz[0] != v:
+                    with open(state.db_path, 'rb') as f:
+                        raw = f.read()
+                    gz = state.gz = (v, gzip.compress(raw, 5), len(raw))
+                body, hdr = (gz[1], {'Content-Encoding': 'gzip'}) if wants_gzip else (gzip.decompress(gz[1]), {})
+            hdr.update({'ETag': etag, 'Cache-Control': 'no-cache'})
+            self._send(200, body, 'application/octet-stream', hdr)
+
+        def do_GET(self):
+            self._handle(False)
+
+        def do_POST(self):
+            self._handle(True)
+
+    return Handler
+
 
 def main():
     ap = argparse.ArgumentParser(description='Browse StarCraft II replays as a searchable library')
     ap.add_argument('--root', default=os.getcwd(), help='folder to scan (default: current folder)')
+    ap.add_argument('--host', default='127.0.0.1', help='default=127.0.0.1')
+    ap.add_argument('--port', type=int, default=0, help='default=0 (pick a free port)')
     ap.add_argument('--scan-only', action='store_true', help='update the database and exit')
+    ap.add_argument('--no-scan', action='store_true', help='serve the existing database without scanning')
+    ap.add_argument('--open', action='store_true', help='open the page in the default browser')
     args = ap.parse_args()
+
     root = os.path.realpath(args.root)
-    os.makedirs(os.path.join(root, '.scry'), exist_ok=True)
-    state = State(root, os.path.join(root, '.scry', 'scry.sqlite'))
-    t = time.time()
-    scan(state)
-    print('scanned %d replay(s) in %.1fs: %s' % (state.done, time.time() - t, state.message))
-    for e in state.errors:
-        print('  ', e)
+    if not os.path.isdir(root):
+        sys.exit('Not a folder: %s' % root)
+    work = os.path.join(root, '.scry')
+    os.makedirs(work, exist_ok=True)
+    state = State(root, os.path.join(work, 'scry.sqlite'))
+    open_db(state.db_path).close()
+
+    if args.scan_only:
+        t = time.time()
+        scan(state)
+        print('scanned %d replay(s) in %.1fs: %s' % (state.done, time.time() - t, state.message))
+        for e in state.errors:
+            print('  ', e)
+        return
+
+    vdir = os.path.join(work, 'vendor')
+    if not ensure_vendor(vdir):
+        sys.exit(1)
+
+    def rescan():
+        if not state.scanning:
+            state.scanning = True
+            threading.Thread(target=scan, args=(state,), daemon=True).start()
+
+    if not args.no_scan:
+        rescan()
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(state, vdir, rescan))
+    server.daemon_threads = True
+    host = 'localhost' if args.host in ('0.0.0.0', '127.0.0.1') else args.host
+    url = 'http://%s:%d/' % (host, server.server_address[1])
+    print('Serving %s' % root)
+    print('Open %s' % url)
+    if args.open:
+        import webbrowser
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print('\nStopped')
+    finally:
+        server.server_close()
 
 
 if __name__ == '__main__':
