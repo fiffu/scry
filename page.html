@@ -45,7 +45,7 @@ aside details.sec>summary{margin:14px 0 6px;font-size:12px;font-weight:700;lette
 /* The + and the minus are drawn as bars, so font metrics cannot push them off centre. */
 .fc:hover small::after{content:'';position:absolute;inset:0;background:linear-gradient(var(--acc),var(--acc)) center/9px 2px no-repeat,linear-gradient(var(--acc),var(--acc)) center/2px 9px no-repeat}
 .fc.on:hover small::after{background:linear-gradient(var(--acc),var(--acc)) center/9px 2px no-repeat}
-#sugg{position:absolute;z-index:20;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004;max-height:300px;overflow:auto}
+#sugg{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 6px);padding:6px 0;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004;max-height:300px;overflow:auto}
 #sugg button{display:flex;width:100%;justify-content:space-between;border:0;border-radius:0;text-align:left}
 #sugg button.sel{background:var(--accbg)}
 .sw{position:relative}
