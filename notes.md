@@ -100,6 +100,14 @@ Measured with `pyodide` 314.0.8 (Python 3.14.2) in Node, running the unchanged `
 - Output is identical to native Python 3.10 for all 6 replays, after sorting each row list.
 - Sizes: Pyodide core is 13 MB uncompressed (9.6 MB wasm, 2.5 MB stdlib zip, 1.2 MB loader). `sc2reader` + `mpyq` zip is 333 KB.
 
-Not verified: Pyodide inside a Web Worker in a real browser, loading a replay chosen in the browser, memory use over hundreds of replays. Two attempts to start a local static server for that test were refused by an automatic permission check, so the browser test was not run.
+Browser test (Chromium, Pyodide in a module Web Worker, files served as static files):
+- The worker was ready in 2.0 s. That covers loading Pyodide, unpacking the `sc2reader` zip and importing `scry.py`.
+- Parse time per replay: 0.26 to 0.86 s. All 6 took 2.6 s in total, about the same as native.
+- Row counts match the native database (3262 stats rows across the 6 replays).
+- The one console error was a 404 for the favicon.
+
+Still not verified: replays chosen through a file picker or directory handle, memory use over hundreds of replays, several workers in parallel.
+
+Environment note: a local static server started with the default bind address (all network interfaces) was refused three times by the automatic permission check, with the reason "Undermining Oversight". The same server bound to 127.0.0.1 was allowed at once. The cause is probably the network exposure, but this is a guess. Bind local test servers to 127.0.0.1.
 
 Bug found by the comparison: unit tags came out in set order, so the output differed between runs (hash seed). Fixed with `sorted()`. The database content was never wrong, only the row order.
