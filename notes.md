@@ -319,3 +319,23 @@ Not built or not verified:
 - The long straight dashed lines look odd when a unit's two snapshots are far apart. They are the data, not a drawing error.
 - Dark mode, and the map on a phone-sized screen.
 - Database size at 200 replays (about 8 MB more than before, by extrapolation).
+
+## Minimap, second pass (2026-11-21)
+
+Behaviour you asked for:
+- Buildings and units that stand stay at full strength. When one is destroyed it becomes an X in the owner's colour, and the X fades out over 90 s of replay time (`FADE_S`). Movement lines and skill diamonds fade with their age (to nothing). Measured: a standing building keeps the same colour; a destroyed turret reads 421, 292, 147, 0 at 3, 30, 60 and 100 s after; a skill diamond reads 96, 80, 42, 0 at 1, 30, 60 and 95 s after the cast.
+- The legend uses the symbols: ■ building, ● unit, ◆ skill, ✕ destroyed, ╌╌ movement, ◯ fight.
+- Units looked still because the first version made each dot jump to its new position at the snapshot time. Facts from the data: the game logs a unit only when it has moved (0 of 563 and 0 of 315 consecutive known positions were the same place), about every 10.7 s (`T_TICK`), and about a quarter of the pairs are exactly one tick apart (continuous motion). So a dot now glides along its dashed line. If two known places are one tick apart it glides over the whole gap. If the gap is longer, the unit waits and glides during the last tick. This glide is a straight-line estimate, not the path taken, and the legend tooltip says so. Checked with pixels on an isolated unit: the dot sits on each estimated spot at the right time and not on the others (ink gains 27, 33, 37).
+
+Flourishes (my choices; all can be dropped):
+- Pop-up labels: every base going up or down, the first building of each type per player (a build order you can watch), and the skills switched on. At most 5 at once, stacked so they do not overlap, and lasting about 2.4 s of REAL time at any speed (`2.4 * speed` replay seconds, at least 6).
+- Fight rings: a pulsing ring where a fight happens, sized by the value lost, fading for 12 s after the last death. The positions come from the fights table.
+- Scoreboard under the map: per player a supply bar, supply, workers and army value, from the stats the game logs about every 7 s.
+- Note captions: while the playhead is inside one of your timeline notes, its text shows across the top of the map. At the end of the replay the winner is shown.
+- Keys: space plays and pauses, the arrow keys seek 5 s (shift: 30 s). Typing in a text box and the buttons keep their own key handling.
+
+Size: the map is 480 px on its longest side (was 340). `K = 1.3` scales the symbols with it. The timeline keeps 940 px at a 1500 px window and drops under the map below about 1134 px.
+
+Checked in Chromium: label, ring, caption and banner appear at the right times and are gone at other times (ink counted around the position), the scoreboard changes with time (BYD 200/218 supply and 8.5k army at 15:00), keys behave, and the static site renders the map from a database the browser parsed.
+
+Not done or not verified: a legend entry for the labels, dark mode, a phone-sized screen, `roundRect` in older browsers (a plain rectangle is used there, untested), and the cost of the larger map on a slow machine (about 12,000 painted pixels at 15:00 on a 20-minute game, no frame problems seen in headless Chromium).
