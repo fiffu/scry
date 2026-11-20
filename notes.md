@@ -377,3 +377,7 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The search suggestion box sits 6 px below the input (was touching it) and has 6 px of padding inside, so the first option is 13 px below the input instead of about 5.
 
 - The incoming-nuke marker has a dotted crosshair now (round dots, reaching 2.2 ring radii past the target, with a centre dot) on top of the pulsing dashed ring. It shows until the nuke lands. Checked in a 3x zoom screenshot.
+
+- More area skills get a dim disc on the minimap (once switched on): FungalGrowth (radius 2.25, 3 s), PsionicStorm (1.5, 2.9 s), EMPRound (1.5, 1 s), BlindingCloud (2, 11 s), ForceField (1.7, 11 s), TemporalField (3.5, 4 s), ParasiticBomb (3, 7 s). Radii and durations are from the game's rules as I remember them, NOT from the replay, so they may be slightly off. They only change how it looks. Only the nuke has the warning ring, the dotted crosshair and the shockwave.
+- A disc is held for at least 1.5 s of real time, so a 3 s fungal is still visible at 8x speed. Checked on a fungal in a real game: the ring pixels are present at +1 s to +14 s and mostly gone by +20 s. A small residue (about 440 colour units) stays at the probe spot. I did not chase it.
+- Casts per skill that have a map position, over the 14 replays: ChronoBoostEnergyCost 223, SpawnLarva 404, CreepTumor 91, CalldownMULE 85, ScannerSweep 61, TacticalNukeStrike 50, FungalGrowth 7, PsionicStorm 2, BlindingCloud 15, ParasiticBomb 13, ForceField 7. Fungal and storm are rare in this sample.
