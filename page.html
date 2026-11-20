@@ -1333,9 +1333,9 @@ function makeMap(d) {
     for (const [c, ep] of epics) {                            // under the icons: the warning ring while it counts down, then the dim blast area
       const x = sx(c.x), y = sy(c.y), Rr = ep.radius * m.scale, hit = c.t + ep.delay;
       if (ep.kind === 'blast' && t < hit) {
-        ctx.globalAlpha = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(t * 3)); ctx.strokeStyle = ep.colour; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
+        const pc = colour.get(c.pid) || ep.colour;                // the ring and the crosshair are in the colour of the player who ordered the nuke
+        ctx.globalAlpha = 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(t * 3)); ctx.strokeStyle = pc; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]);
         ctx.beginPath(); ctx.arc(x, y, Rr, 0, 6.2832); ctx.stroke(); ctx.setLineDash([]);
-        const pc = colour.get(c.pid) || ep.colour;                // the crosshair is in the colour of the player who ordered the nuke
         ctx.strokeStyle = pc; ctx.setLineDash([]); ctx.lineWidth = 1; ctx.globalAlpha = 0.35;   // solid and dim, across the whole map
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(m.w, y); ctx.moveTo(x, 0); ctx.lineTo(x, m.h); ctx.stroke();
         ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.arc(x, y, 1.8, 0, 6.2832); ctx.fillStyle = pc; ctx.fill();

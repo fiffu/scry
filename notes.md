@@ -395,3 +395,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The nuke's dotted crosshair is in the colour of the player who ordered it, and its lines run across the whole minimap (edge to edge). The pulsing ring around the target stays red. Checked in a screenshot (a yellow player's nuke).
 
 - The nuke crosshair is a solid dim line (1 px, 35% opacity) in the player's colour, not dotted. The centre dot stays brighter (90%).
+
+- The nuke's dashed warning ring is in the player's colour too. The dim blast disc, the shockwave and the flash after landing stay red.
