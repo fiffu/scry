@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 2  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 3  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -303,7 +303,8 @@ def parse_replay(path):
                 born[e.control_pid].append(dict(t=e.frame / FPS, name=e.unit_type_name))
         elif n == 'UnitInitEvent':
             u = e.unit
-            if u and u.name not in JUNK_UNITS and not u.name.startswith('CreepTumor'):
+            # Warp-ins fire UnitInit too, so keep only real buildings.
+            if u and u.is_building and u.name not in JUNK_UNITS and not u.name.startswith('CreepTumor'):
                 structs[e.control_pid].append(dict(t=e.frame / FPS, name=e.unit_type_name, x=e.x, y=e.y))
         elif n == 'UnitTypeChangeEvent':
             u = e.unit
@@ -344,7 +345,7 @@ def parse_replay(path):
                 t = e.frame / FPS
                 if is_skill(ab):
                     cmds[e.player.pid].append((t, ab))
-                elif ab.startswith(('Research', 'Evolve', 'Upgrade')):
+                elif ab.startswith(('Research', 'Evolve', 'Upgrade')) and not ab.startswith('UpgradeTo'):
                     research[e.player.pid].append((t, ab))
 
     leaves = {}

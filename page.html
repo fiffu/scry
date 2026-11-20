@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>scry</title>
+<style>
+:root{--bg:#e8ebee;--panel:#f6f7f8;--line:#cdd2d7;--fg:#1d2328;--mut:#68727c;--acc:#0e6a68;--accbg:#d3ebe9;--warn:#a2331f;--ob:#6b3fa0;--obbg:#e7ddf4;--bar:#d6dbe0;--win:#2c7a3f;--loss:#a2331f;--sup:#3b7fb5;--fgt:#c0562f}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1e22;--panel:#23282d;--line:#394046;--fg:#e4e8eb;--mut:#8e98a1;--acc:#52c3bd;--accbg:#1d3b3a;--warn:#ff8a73;--ob:#b794f0;--obbg:#31234b;--bar:#171b1f;--win:#6fd08a;--loss:#ff8a73;--sup:#6fb2e6;--fgt:#f08a5d}}
+*{box-sizing:border-box}[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.35 ui-sans-serif,system-ui,"Segoe UI",sans-serif}
+header{position:relative;display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+header b{font-size:15px;margin-right:4px}
+#dir{flex:1;min-width:0;height:36px;cursor:pointer;font:13px ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
+#status{color:var(--mut);white-space:nowrap}
+#status.warn{color:var(--warn)}
+#tree{position:absolute;top:100%;left:14px;z-index:30;min-width:300px;max-width:calc(100vw - 28px);max-height:65vh;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004}
+.tn{display:flex;width:100%;justify-content:space-between;gap:14px;align-items:center;text-align:left;border:0;background:none;border-radius:4px;min-height:34px;font:13px ui-monospace,Menlo,Consolas,monospace}
+.tn:hover{background:color-mix(in srgb,var(--fg) 6%,transparent)}
+.tn.cur{background:color-mix(in srgb,var(--fg) 12%,transparent);font-weight:600}
+.tn small{color:var(--mut);font:11px ui-sans-serif,system-ui,sans-serif}
+button,select,input,textarea{font:inherit;color:var(--fg)}
+button{background:var(--panel);border:1px solid var(--line);border-radius:5px;min-height:34px;min-width:34px;padding:0 12px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button.pri{background:var(--acc);border-color:var(--acc);color:var(--panel);font-weight:600}
+input[type=text],input:not([type]),select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:0 8px;min-height:32px}
+textarea{padding:6px 8px;width:100%;min-height:80px;resize:vertical}
+#lib{flex:1;min-height:0;display:grid;grid-template-columns:350px minmax(0,1fr)}
+aside{min-height:0;overflow-y:auto;background:var(--panel);border-right:1px solid var(--line);padding:10px 12px}
+aside h4{margin:14px 0 6px;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+aside h4:first-child{margin-top:0}
+#list{min-height:0;overflow-y:auto;padding:12px 16px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{display:inline-flex;gap:5px;align-items:center;min-height:26px;padding:0 8px;border-radius:13px;border:1px solid var(--line);background:var(--bg);font-size:12.5px;cursor:pointer;white-space:nowrap}
+.chip.on{background:var(--accbg);border-color:var(--acc)}
+.chip.neg{background:color-mix(in srgb,var(--warn) 15%,var(--panel));border-color:var(--warn);text-decoration:line-through}
+.chip small{color:var(--mut);font-size:11px}
+.chip.flat{cursor:default}
+.chip.mine{border-color:var(--ob);background:var(--obbg)}
+#sugg{position:absolute;z-index:20;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004;max-height:300px;overflow:auto}
+#sugg button{display:flex;width:100%;justify-content:space-between;border:0;border-radius:0;text-align:left}
+#sugg button.sel{background:var(--accbg)}
+.sw{position:relative}
+details{margin:2px 0}
+summary{cursor:pointer;padding:4px 0;font-weight:600;font-size:13px}
+summary small{color:var(--mut);font-weight:400}
+.cond{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:8px;margin:6px 0;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+.cond select,.cond input{width:100%;min-width:0}
+.cond .wide{grid-column:1/-1}
+.hist{margin:6px 0 10px}
+.hist .hl{display:flex;justify-content:space-between;font-size:12px;color:var(--mut)}
+.hist canvas{display:block;width:100%;height:34px}
+.hist .rg{position:relative;height:20px}
+.hist input[type=range]{position:absolute;left:0;right:0;width:100%;margin:0;pointer-events:none;-webkit-appearance:none;background:none;height:20px}
+.hist input[type=range]::-webkit-slider-thumb{pointer-events:auto;-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--acc);border:2px solid var(--panel);cursor:pointer}
+.hist input[type=range]::-moz-range-thumb{pointer-events:auto;width:12px;height:12px;border-radius:50%;background:var(--acc);border:2px solid var(--panel);cursor:pointer}
+.hist input[type=range]::-webkit-slider-runnable-track{background:var(--line);height:3px;margin-top:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:10px;cursor:pointer}
+.card:hover{border-color:var(--acc)}
+.card .top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.card .top b{font-size:15px}
+.card .top span{color:var(--mut)}
+.card .when{margin-left:auto}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;margin:8px 0}
+.pl{display:flex;gap:6px;align-items:center;min-width:0}
+.pl .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl .win{color:var(--win)}.pl .loss{color:var(--loss)}
+.pl small{color:var(--mut)}
+.race{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:4px;font:700 11px ui-monospace,monospace;color:#fff;flex:none}
+.race.T{background:#3f7cc0}.race.P{background:#b08d1f}.race.Z{background:#9a46b8}
+.err{color:var(--warn)}
+.empty{color:var(--mut);padding:24px;text-align:center}
+#game{flex:1;min-height:0;overflow-y:auto;padding:14px 18px 40px}
+#game h2{margin:0 0 4px}
+.sub{color:var(--mut);margin-bottom:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.panel h3{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+#tl{width:100%;overflow:hidden;position:relative}
+#tl svg{display:block;user-select:none}
+#tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre;box-shadow:0 4px 14px #0004;z-index:5}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{padding:3px 8px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:12px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.steps{font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace}
+.steps .hit{background:var(--accbg);border-radius:3px;outline:1px solid var(--acc)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:6px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.mark{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
+@media (max-width:900px){#lib{grid-template-columns:1fr;grid-auto-rows:auto;overflow-y:auto}aside{border-right:0;border-bottom:1px solid var(--line);max-height:60vh}}
+</style></head><body>
+<header>
+ <b>scry</b>
+ <input id="dir" readonly aria-label="Folder (click to browse)" title="Click to browse folders">
+ <button id="browse" aria-label="Browse folders">Folders ▾</button>
+ <span id="status" role="status"></span>
+ <button id="rescan" title="Look for new or changed replays">Rescan</button>
+ <button id="exp" title="Download your notes as a file">Export notes</button>
+ <button id="imp" title="Load notes from a file">Import notes</button>
+ <input id="impfile" type="file" accept="application/json,.json" hidden>
+ <div id="tree" hidden></div>
+</header>
+
+<main id="lib">
+ <aside>
+  <h4>Search</h4>
+  <div class="sw">
+   <input id="q" placeholder="skill, build, unit, chat text…" spellcheck="false" autocomplete="off" aria-label="Search" style="width:100%">
+   <div id="sugg" hidden></div>
+  </div>
+  <h4>Active filters <button id="clear" style="min-height:22px;padding:0 8px;font-size:12px">clear</button></h4>
+  <div class="chips" id="active"></div>
+  <h4>Players</h4>
+  <div class="chips" id="players"></div>
+  <label class="row" style="margin-top:6px;font-size:12.5px;color:var(--mut)"><input type="checkbox" id="scope" checked> tags must belong to the selected player</label>
+  <h4>Build timing</h4>
+  <div id="conds"></div>
+  <button id="addcond">+ Add condition</button>
+  <h4>Timing ranges</h4>
+  <div id="hists"></div>
+  <h4>Tags</h4>
+  <div id="facets"></div>
+ </aside>
+ <section id="list"></section>
+</main>
+
+<main id="game" hidden></main>
+
+<script type="module">
+import sqlite3InitModule from '/vendor/index.mjs';
+
+const $ = s => document.querySelector(s);
+function h(tag, props = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'on') for (const [ev, f] of Object.entries(v)) e.addEventListener(ev, f);
+    else if (k === 'class') e.className = v;
+    else if (k === 'style') e.style.cssText = v;
+    else e[k] = v;
+  }
+  e.append(...kids.filter(k => k !== null && k !== undefined));
+  return e;
+}
+const fmt = t => { t = Math.max(0, Math.round(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+function parseTime(s) {
+  s = String(s).trim();
+  const m = s.match(/^(\d+):(\d{1,2})$/);
+  if (m) return +m[1] * 60 + +m[2];
+  return /^\d+(\.\d+)?$/.test(s) ? +s : null;
+}
+const ph = n => Array(n).fill('?').join(',');
+const likeEsc = s => s.replace(/[\\%_]/g, c => '\\' + c);
+const ftsq = s => '"' + s.replace(/"/g, '""') + '"';
+const RACE = { Terran: 'T', Protoss: 'P', Zerg: 'Z' };
+
+/* ------------------------------------------------------------------ database */
+let sqlite3, db = null, loadedVersion = -1, loadedAt = 0;
+const rows = (sql, bind = []) => db.exec({ sql, bind, rowMode: 'object', returnValue: 'resultRows' });
+const run = (sql, bind = []) => db.exec({ sql, bind });
+
+async function loadDb() {
+  const res = await fetch('/db', { cache: 'no-store' });
+  if (!res.ok) throw new Error('Could not load the database: ' + res.status);
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const next = new sqlite3.oo1.DB(':memory:');
+  const p = sqlite3.wasm.allocFromTypedArray(bytes);
+  const rc = sqlite3.capi.sqlite3_deserialize(next.pointer, 'main', p, bytes.length, bytes.length,
+    sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_RESIZEABLE);
+  if (rc) throw new Error('sqlite3_deserialize failed: ' + rc);
+  const old = db;
+  db = next;
+  if (old) old.close();
+  setupDb();
+  loadedAt = Date.now();
+}
+
+const SYN = [
+  [/Nuke/i, 'nuke nuclear ghost'], [/Stimpack/i, 'stim stimpack marine marauder'],
+  [/ScannerSweep/i, 'scan scanner sweep detection'], [/MULE/i, 'mule'], [/SpawnLarva/i, 'inject queen larva'],
+  [/ChronoBoost/i, 'chrono chronoboost'], [/NeuralParasite/i, 'neural mind control'], [/Fungal/i, 'fungal'],
+  [/PsionicStorm/i, 'storm psi templar'], [/ForceField/i, 'ff sentry'], [/Graviton/i, 'graviton phoenix lift'],
+  [/Siege/i, 'siege tank'], [/Cloak/i, 'cloak ghost'], [/Burrow/i, 'burrow'], [/EMP/i, 'emp'],
+  [/Transfusion/i, 'transfuse queen heal'], [/12-pool/, 'twelve pool'], [/cannon-rush/, 'cannon rush forge'],
+  [/reaper-expand/, 'reaper expand'], [/maxed-out/, 'max 200 supply'], [/base-trade/, 'base trade'],
+  [/leaver/, 'left quit rage'], [/stomp/, 'one sided crush'], [/CreepTumor/, 'creep'],
+];
+const words = s => s.replace(/([a-z])([A-Z0-9])/g, '$1 $2').replace(/[-_:]/g, ' ');
+
+function setupDb() {
+  run(`create temp table notes_t(rid int primary key, id text, text text);
+       create temp table mine_tags(rid int, tag text);
+       create temp table sel(rid int primary key);
+       create temp view all_tags as select rid,pid,family,tag,label from tags
+         union all select rid,null,'mine','mine:'||tag,tag from mine_tags;`);
+  run(`create virtual table fts_tags using fts5(label, syn, tag unindexed, family unindexed, tokenize='trigram')`);
+  run(`create virtual table fts_text using fts5(text, rid unindexed, kind unindexed, tokenize='trigram')`);
+  run(`insert into fts_text select text, rid, 'chat' from chat`);
+  syncNotes();
+}
+function rebuildTagIndex() {
+  run('delete from fts_tags');
+  const tags = rows('select distinct tag, family, label from all_tags');
+  db.transaction(() => {
+    for (const t of tags) {
+      const syn = [t.family, words(t.tag), ...SYN.filter(([re]) => re.test(t.tag)).map(x => x[1])].join(' ');
+      run('insert into fts_tags(label, syn, tag, family) values(?,?,?,?)', [t.label, syn, t.tag, t.family]);
+    }
+  });
+}
+
+/* --------------------------------------------------------------------- notes */
+const NOTES_KEY = 'scry.notes.v1';
+let notes = {};
+function loadNotes() { try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') || {}; } catch { notes = {}; } }
+function saveNotes() {
+  try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes)); } catch (e) { toast('Could not save notes: ' + e.message, true); }
+  syncNotes();
+}
+function noteFor(id, fp) {
+  if (!notes[id]) notes[id] = { fp: fp || '', text: '', tags: [], marks: [] };
+  return notes[id];
+}
+function syncNotes() {
+  run('delete from notes_t; delete from mine_tags; delete from fts_text where kind=\'note\'');
+  const byId = new Map(), byFp = new Map();
+  for (const r of rows('select rid, id, fingerprint from replays')) { byId.set(r.id, r); if (r.fingerprint) byFp.set(r.fingerprint, r); }
+  db.transaction(() => {
+    for (const [id, n] of Object.entries(notes)) {
+      const r = byId.get(id) || byFp.get(n.fp);
+      if (!r) continue;
+      const text = [n.text, ...(n.marks || []).map(m => m.text)].filter(Boolean).join('\n');
+      run('insert or replace into notes_t values(?,?,?)', [r.rid, id, text]);
+      for (const t of n.tags || []) run('insert into mine_tags values(?,?)', [r.rid, t]);
+      if (text) run('insert into fts_text(text, rid, kind) values(?,?,\'note\')', [text, r.rid]);
+    }
+  });
+  rebuildTagIndex();
+}
+$('#exp').onclick = () => {
+  const blob = new Blob([JSON.stringify(notes, null, 1)], { type: 'application/json' });
+  const a = h('a', { href: URL.createObjectURL(blob), download: 'scry-notes.json' });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$('#imp').onclick = () => $('#impfile').click();
+$('#impfile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const inc = JSON.parse(await f.text());
+    let n = 0;
+    for (const [id, v] of Object.entries(inc)) { if (v && typeof v === 'object') { notes[id] = { fp: '', text: '', tags: [], marks: [], ...v }; n++; } }
+    saveNotes(); refresh(); toast('Imported notes for ' + n + ' game(s)');
+  } catch (x) { toast('Import failed: ' + x.message, true); }
+  e.target.value = '';
+};
+
+/* ------------------------------------------------------------------- filters */
+const S = {
+  folder: '', desc: true, shown: 60,
+  tags: [], players: new Map(), scope: true, texts: [], conds: [], ranges: {},
+};
+const THING_LABEL = {
+  natural: 'Natural expansion started', third_base: 'Third base started', first_gas: 'First gas',
+  first_production: 'First production building', first_tech: 'First tech building',
+  first_army: 'First army unit', max_supply: 'Reached 200 supply',
+};
+const RANGE_KEYS = [['natural', 'Natural expansion'], ['third_base', 'Third base'], ['first_gas', 'First gas'],
+  ['first_army', 'First army unit'], ['duration', 'Game length']];
+
+function anyFilter() {
+  return S.tags.length || S.players.size || S.texts.length || S.conds.length || Object.keys(S.ranges).length;
+}
+function playerScope(alias) {
+  return `${alias}.pid in (select q.pid from players q where q.rid=${alias}.rid and q.toon in (${ph(S.players.size)}))`;
+}
+function condSql(c, p) {
+  const tbl = c.kind === 'timing' ? 'timings' : 'build_steps';
+  const parts = [c.kind === 'timing' ? 'x.key=?' : 'x.name=?'];
+  p.push(c.name);
+  if (c.kind === 'step' && c.nth) { parts.push('x.nth=?'); p.push(c.nth); }
+  if (c.op === 'before') { parts.push('x.t < ?'); p.push(c.a); }
+  else if (c.op === 'after') { parts.push('x.t >= ?'); p.push(c.a); }
+  else if (c.op === 'between') { parts.push('x.t between ? and ?'); p.push(c.a, Math.max(c.a, c.b)); }
+  else if (c.op === 'sup<=') { parts.push('x.supply <= ?'); p.push(c.a); }
+  else if (c.op === 'sup>=') { parts.push('x.supply >= ?'); p.push(c.a); }
+  return [tbl, parts.join(' and ')];
+}
+function whereSql() {
+  const w = [], p = [];
+  if (!anyFilter()) { /* show broken replays too, so the user sees them */ } else w.push('r.error is null');
+  if (S.folder) { w.push("r.path like ? escape '\\'"); p.push(likeEsc(S.folder) + '/%'); }
+  const scoped = S.scope && S.players.size;
+  for (const f of S.tags) {
+    let sql = 'exists (select 1 from all_tags t where t.rid=r.rid and t.tag=?';
+    p.push(f.tag);
+    if (scoped) { sql += ` and (t.pid is null or ${playerScope('t')})`; p.push(...S.players.keys()); }
+    sql += ')';
+    w.push(f.neg ? 'not ' + sql : sql);
+  }
+  if (S.players.size) { w.push(`exists (select 1 from players q where q.rid=r.rid and q.toon in (${ph(S.players.size)}))`); p.push(...S.players.keys()); }
+  for (const t of S.texts) { w.push('r.rid in (select rid from fts_text where fts_text match ?)'); p.push(ftsq(t)); }
+  const same = [];
+  for (const c of S.conds) {
+    if (c.a === null || c.a === undefined || (c.op === 'between' && (c.b === null || c.b === undefined))) continue;
+    if (c.scope === 'same') { same.push(c); continue; }
+    const [tbl, pred] = condSql(c, p);
+    let sql = `exists (select 1 from ${tbl} x where x.rid=r.rid and ${pred}`;
+    if (c.scope === 'selected' && S.players.size) { sql += ` and ${playerScope('x')}`; p.push(...S.players.keys()); }
+    w.push(sql + ')');
+  }
+  if (same.length) {
+    const inner = same.map(c => {
+      const [tbl, pred] = condSql(c, p);
+      return `exists (select 1 from ${tbl} x where x.rid=q.rid and x.pid=q.pid and ${pred})`;
+    });
+    w.push(`exists (select 1 from players q where q.rid=r.rid and ${inner.join(' and ')})`);
+  }
+  for (const [key, [lo, hi]] of Object.entries(S.ranges)) {
+    if (key === 'duration') { w.push('r.duration_s between ? and ?'); p.push(lo, hi); }
+    else { w.push('exists (select 1 from timings x where x.rid=r.rid and x.key=? and x.t between ? and ?)'); p.push(key, lo, hi); }
+  }
+  return [w.length ? 'where ' + w.join(' and ') : '', p];
+}
+
+let refreshTimer = 0;
+function refreshSoon() { clearTimeout(refreshTimer); refreshTimer = setTimeout(refresh, 120); }
+
+function refresh() {
+  if (!db) return;
+  S.shown = 60;
+  const [where, params] = whereSql();
+  run('delete from sel');
+  try { run(`insert into sel select r.rid from replays r ${where}`, params); }
+  catch (e) { toast('Filter error: ' + e.message, true); console.error(e); return; }
+  renderActive(); renderPlayers(); renderFacets(); renderList(); renderConds();
+  if (!$('#hists').childElementCount) renderHists();
+}
+
+/* ---- active chips */
+function renderActive() {
+  const box = $('#active'); box.replaceChildren();
+  const x = (label, cls, fn, title) => box.append(h('span', { class: 'chip ' + cls, title: title || '', on: { click: fn } }, label, h('small', {}, '✕')));
+  S.tags.forEach((f, i) => x((f.neg ? 'NOT ' : '') + f.tag, f.neg ? 'neg' : 'on', () => { S.tags.splice(i, 1); refresh(); }, 'Remove'));
+  S.texts.forEach((t, i) => x('text: ' + t, 'on', () => { S.texts.splice(i, 1); refresh(); }, 'Remove'));
+  for (const [k, [lo, hi]] of Object.entries(S.ranges)) {
+    x((k === 'duration' ? 'length' : k) + ' ' + fmt(lo) + '–' + fmt(hi), 'on', () => { delete S.ranges[k]; $('#hists').replaceChildren(); refresh(); }, 'Remove');
+  }
+  if (!box.childElementCount) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'none'));
+}
+$('#clear').onclick = () => {
+  S.tags = []; S.texts = []; S.players.clear(); S.conds = []; S.ranges = {};
+  $('#hists').replaceChildren(); refresh();
+};
+
+/* ---- players */
+function renderPlayers() {
+  const box = $('#players'); box.replaceChildren();
+  const list = rows(`select toon, max(name) name, count(distinct rid) c from players
+    where rid in (select rid from sel) and toon not like 'name:%' group by toon order by c desc, name limit 24`);
+  const seen = new Set(list.map(r => r.toon));
+  for (const [toon, name] of S.players) if (!seen.has(toon)) list.unshift({ toon, name, c: 0 });
+  for (const r of list) {
+    const on = S.players.has(r.toon);
+    box.append(h('span', { class: 'chip' + (on ? ' on' : ''), title: r.toon, on: { click: () => {
+      if (on) S.players.delete(r.toon); else S.players.set(r.toon, r.name);
+      refresh();
+    } } }, r.name, h('small', {}, String(r.c))));
+  }
+  if (!list.length) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'no players'));
+}
+$('#scope').onchange = e => { S.scope = e.target.checked; refresh(); };
+
+/* ---- facets */
+const FAMS = [['mode', 'Mode'], ['map', 'Map'], ['matchup', 'Matchup'], ['build', 'Builds'], ['group', 'Skill groups'],
+  ['skill', 'Skills'], ['unit', 'Units'], ['upgrade', 'Upgrades'], ['shape', 'Shape of the game'],
+  ['spectacle', 'Spectacle'], ['econ', 'Economy'], ['people', 'People'], ['mine', 'Mine']];
+const openFams = new Set(['build', 'group', 'shape', 'spectacle']);
+const famAll = new Set();
+function tagState(tag) { return S.tags.find(f => f.tag === tag); }
+function cycleTag(tag) {
+  const f = tagState(tag);
+  if (!f) S.tags.push({ tag, neg: false });
+  else if (!f.neg) f.neg = true;
+  else S.tags.splice(S.tags.indexOf(f), 1);
+  refresh();
+}
+function renderFacets() {
+  const box = $('#facets'); box.replaceChildren();
+  const counts = rows(`select family, tag, label, count(distinct rid) c from all_tags
+    where rid in (select rid from sel) group by family, tag, label order by c desc, label`);
+  const by = {};
+  for (const r of counts) (by[r.family] ||= []).push(r);
+  for (const [fam, title] of FAMS) {
+    const list = by[fam] || [];
+    const d = h('details', { open: openFams.has(fam) });
+    d.addEventListener('toggle', () => { d.open ? openFams.add(fam) : openFams.delete(fam); });
+    d.append(h('summary', {}, title + ' ', h('small', {}, '(' + list.length + ')')));
+    const chips = h('div', { class: 'chips' });
+    const limit = famAll.has(fam) ? 1e9 : 14;
+    for (const r of list.slice(0, limit)) {
+      const st = tagState(r.tag);
+      chips.append(h('span', { class: 'chip' + (st ? (st.neg ? ' neg' : ' on') : '') + (fam === 'mine' ? ' mine' : ''),
+        title: r.tag + ' (click: include, again: exclude, again: clear)', on: { click: () => cycleTag(r.tag) } }, r.label, h('small', {}, String(r.c))));
+    }
+    if (list.length > limit) chips.append(h('span', { class: 'chip', on: { click: () => { famAll.add(fam); renderFacets(); } } }, '+' + (list.length - limit) + ' more'));
+    d.append(chips);
+    if (list.length || fam !== 'mine') box.append(d);
+  }
+}
+
+/* ---- search box */
+let suggItems = [], suggSel = -1;
+function suggest() {
+  const q = $('#q').value.trim(), box = $('#sugg');
+  suggItems = [];
+  if (q) {
+    try {
+      const r = q.length >= 3
+        ? rows('select tag, label, family from fts_tags where fts_tags match ? order by rank limit 12', [ftsq(q)])
+        : rows("select tag, label, family from fts_tags where label like ? escape '\\' or syn like ? escape '\\' limit 12", ['%' + likeEsc(q) + '%', '%' + likeEsc(q) + '%']);
+      const cnt = new Map(rows('select tag, count(distinct rid) c from all_tags where rid in (select rid from sel) group by tag').map(x => [x.tag, x.c]));
+      suggItems = r.map(x => ({ kind: 'tag', tag: x.tag, label: x.label, family: x.family, c: cnt.get(x.tag) || 0 }));
+    } catch (e) { console.error(e); }
+    if (q.length >= 3) suggItems.push({ kind: 'text', text: q });
+  }
+  suggSel = -1;
+  box.replaceChildren(...suggItems.map((it, i) => h('button', { class: i === suggSel ? 'sel' : '', on: { mousedown: e => { e.preventDefault(); pick(it); } } },
+    it.kind === 'tag' ? h('span', {}, it.label + ' ', h('small', { style: 'color:var(--mut)' }, it.family)) : h('span', {}, 'Search chat and notes for "' + it.text + '"'),
+    it.kind === 'tag' ? h('small', { style: 'color:var(--mut)' }, it.c + ' game(s)') : null)));
+  box.hidden = !suggItems.length;
+}
+function pick(it) {
+  if (it.kind === 'tag') { if (!tagState(it.tag)) S.tags.push({ tag: it.tag, neg: false }); }
+  else if (!S.texts.includes(it.text)) S.texts.push(it.text);
+  $('#q').value = ''; $('#sugg').hidden = true; refresh();
+}
+$('#q').addEventListener('input', suggest);
+$('#q').addEventListener('blur', () => setTimeout(() => $('#sugg').hidden = true, 100));
+$('#q').addEventListener('keydown', e => {
+  const btns = [...$('#sugg').children];
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    suggSel = (suggSel + (e.key === 'ArrowDown' ? 1 : -1) + btns.length) % Math.max(btns.length, 1);
+    btns.forEach((b, i) => b.classList.toggle('sel', i === suggSel));
+  } else if (e.key === 'Enter') {
+    const it = suggItems[suggSel >= 0 ? suggSel : 0];
+    if (it) pick(it);
+  } else if (e.key === 'Escape') $('#sugg').hidden = true;
+});
+
+/* ---- build timing conditions */
+let thingOptions = null;
+function things() {
+  if (!thingOptions) {
+    const steps = rows('select kind, name, count(*) c from build_steps group by kind, name order by kind, name');
+    thingOptions = { timing: Object.keys(THING_LABEL), struct: [], unit: [], research: [], morph: [] };
+    for (const s of steps) thingOptions[s.kind].push(s.name);
+  }
+  return thingOptions;
+}
+$('#addcond').onclick = () => {
+  const t = things();
+  S.conds.push({ scope: 'any', kind: 'timing', name: t.timing[0], nth: 1, op: 'before', a: null, b: null, ta: '', tb: '' });
+  renderConds();
+};
+function sel(options, value, onchange, title) {
+  const s = h('select', { title: title || '', on: { change: () => onchange(s.value) } });
+  for (const o of options) {
+    if (o.group) { const g = h('optgroup', { label: o.group }); o.items.forEach(([v, l]) => g.append(h('option', { value: v, selected: v === value }, l))); s.append(g); }
+    else s.append(h('option', { value: o[0], selected: o[0] === value }, o[1]));
+  }
+  return s;
+}
+function renderConds() {
+  const box = $('#conds');
+  if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return; // do not rebuild while typing
+  box.replaceChildren();
+  const t = things();
+  S.conds.forEach((c, i) => {
+    const thingOpts = [
+      { group: 'Timings', items: t.timing.map(k => ['timing:' + k, THING_LABEL[k]]) },
+      { group: 'Structures', items: t.struct.map(n => ['step:' + n, n]) },
+      { group: 'Units (first one)', items: t.unit.map(n => ['step:' + n, n]) },
+      { group: 'Research and upgrades', items: t.research.concat(t.morph).map(n => ['step:' + n, n]) },
+    ];
+    const ops = [['before', 'before'], ['after', 'at or after'], ['between', 'between']];
+    if (c.kind === 'step') ops.push(['sup<=', 'at supply ≤'], ['sup>=', 'at supply ≥']);
+    const timeIn = (key, ph) => h('input', { value: c[key + 'x'] ?? '', placeholder: ph, on: { input: e => {
+      c[key + 'x'] = e.target.value;
+      const v = c.op.startsWith('sup') ? (/^\d+$/.test(e.target.value.trim()) ? +e.target.value : null) : parseTime(e.target.value);
+      c[key] = v; refreshSoon();
+    } } });
+    const isSup = c.op.startsWith('sup');
+    box.append(h('div', { class: 'cond' },
+      sel([['any', 'any player'], ['same', 'same player (all marked)'], ['selected', 'selected players']], c.scope, v => { c.scope = v; refresh(); }, 'Which player must match'),
+      c.kind === 'step' ? sel([[1, '1st'], [2, '2nd'], [3, '3rd'], [4, '4th'], [0, 'any']].map(([v, l]) => [String(v), l]), String(c.nth), v => { c.nth = +v; refresh(); }) : h('span'),
+      (() => { const s = sel(thingOpts, c.kind + ':' + c.name, v => { const [k, ...n] = v.split(':'); c.kind = k; c.name = n.join(':'); if (k === 'timing' && c.op.startsWith('sup')) c.op = 'before'; refresh(); renderConds(); }); s.classList.add('wide'); s.style.gridColumn = '1/-1'; return s; })(),
+      sel(ops, c.op, v => { c.op = v; c.a = c.b = null; c.ax = c.bx = ''; renderConds(); refresh(); }),
+      isSup ? timeIn('a', 'supply') : timeIn('a', 'm:ss'),
+      c.op === 'between' ? timeIn('b', 'm:ss') : h('span'),
+      h('button', { class: 'wide', style: 'grid-column:1/-1;min-height:26px', on: { click: () => { S.conds.splice(i, 1); renderConds(); refresh(); } } }, 'Remove condition')));
+  });
+}
+
+/* ---- histogram sliders */
+function renderHists() {
+  const box = $('#hists'); box.replaceChildren();
+  const scope = S.folder ? "where rid in (select rid from replays where path like ? escape '\\')" : '';
+  const sp = S.folder ? [likeEsc(S.folder) + '/%'] : [];
+  for (const [key, label] of RANGE_KEYS) {
+    const vals = key === 'duration'
+      ? rows(`select duration_s v from replays where error is null ${S.folder ? "and path like ? escape '\\'" : ''}`, sp).map(r => r.v)
+      : rows(`select t v from timings ${scope ? scope + ' and key=?' : 'where key=?'}`, [...sp, key]).map(r => r.v);
+    if (vals.length < 2) continue;
+    const lo = Math.floor(Math.min(...vals)), hi = Math.ceil(Math.max(...vals));
+    if (hi <= lo) continue;
+    const cur = S.ranges[key] || [lo, hi];
+    const cv = h('canvas', { width: 300, height: 34 });
+    const label_ = h('span', {}, '');
+    const a = h('input', { type: 'range', min: lo, max: hi, value: cur[0], step: 1 });
+    const b = h('input', { type: 'range', min: lo, max: hi, value: cur[1], step: 1 });
+    const draw = () => {
+      const x = cv.getContext('2d'), n = 24, bins = Array(n).fill(0);
+      for (const v of vals) bins[Math.min(n - 1, Math.floor((v - lo) / (hi - lo) * n))]++;
+      const m = Math.max(...bins), a1 = +a.value, b1 = +b.value;
+      x.clearRect(0, 0, 300, 34);
+      const css = getComputedStyle(document.documentElement);
+      bins.forEach((c, i) => {
+        const v0 = lo + i / n * (hi - lo);
+        x.fillStyle = v0 >= a1 - (hi - lo) / n && v0 <= b1 ? css.getPropertyValue('--acc') : css.getPropertyValue('--line');
+        const hh = c / m * 32; x.fillRect(i * 12.5 + 1, 34 - hh, 10.5, hh);
+      });
+      label_.textContent = fmt(a1) + ' – ' + fmt(b1) + (key === 'duration' ? '' : '');
+    };
+    const upd = () => {
+      let x = +a.value, y = +b.value;
+      if (x > y) { [x, y] = [y, x]; a.value = x; b.value = y; }
+      if (x <= lo && y >= hi) delete S.ranges[key]; else S.ranges[key] = [x, y];
+      draw(); refreshSoon();
+    };
+    a.oninput = b.oninput = upd;
+    draw();
+    box.append(h('div', { class: 'hist' }, h('div', { class: 'hl' }, h('span', {}, label), label_), cv, h('div', { class: 'rg' }, a, b)));
+  }
+  if (!box.childElementCount) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'not enough data yet'));
+}
+
+/* ------------------------------------------------------------------- list */
+function renderList() {
+  const box = $('#list');
+  const total = rows('select count(*) n from replays r ' + (S.folder ? "where r.path like ? escape '\\'" : ''), S.folder ? [likeEsc(S.folder) + '/%'] : [])[0].n;
+  const n = rows('select count(*) n from sel')[0].n;
+  $('#status').textContent = n + (anyFilter() ? ' of ' + total : '') + ' game(s)';
+  box.replaceChildren();
+  if (!total) { box.append(h('div', { class: 'empty' }, 'No replays found under ' + (S.folder || 'this folder') + '. Put .SC2Replay files here and press Rescan.')); return; }
+  if (!n) { box.append(h('div', { class: 'empty' }, 'No games match the filters.')); return; }
+  const order = S.desc ? 'desc' : 'asc';
+  const games = rows(`select r.rid, r.id, r.path, r.map, r.mode, r.played_at, r.duration_s, r.winner_team, r.error
+    from replays r join sel using(rid) order by r.played_at ${order}, r.rid ${order} limit ?`, [S.shown]);
+  const ids = games.map(g => g.rid);
+  const pls = {}, tgs = {};
+  if (ids.length) {
+    for (const p of rows(`select rid, pid, toon, name, team, race, result, apm_blizzard apm from players where rid in (${ph(ids.length)}) order by team, pid`, ids)) (pls[p.rid] ||= []).push(p);
+    for (const t of rows(`select rid, pid, tag, label, family from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','people')`, ids)) (tgs[t.rid] ||= []).push(t);
+  }
+  box.append(h('div', { class: 'row', style: 'margin-bottom:8px;color:var(--mut)' }, 'Sorted by date, ',
+    h('button', { style: 'min-height:24px', on: { click: () => { S.desc = !S.desc; renderList(); } } }, S.desc ? 'newest first' : 'oldest first')));
+  for (const g of games) {
+    if (g.error) {
+      box.append(h('div', { class: 'card' }, h('div', { class: 'top' }, h('b', {}, g.path), h('span', { class: 'err' }, 'could not be parsed: ' + g.error))));
+      continue;
+    }
+    const mine = (notes[g.id] || {});
+    const players = pls[g.rid] || [];
+    const tagsOf = tgs[g.rid] || [];
+    const teamEls = players.map(p => {
+      const bl = tagsOf.filter(t => t.pid === p.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => t.label).join(', ');
+      return h('div', { class: 'pl' },
+        h('span', { class: 'race ' + (RACE[p.race] || '') }, RACE[p.race] || '?'),
+        h('span', { class: 'nm ' + (p.result === 'Win' ? 'win' : p.result === 'Loss' ? 'loss' : ''), title: p.name }, p.name),
+        h('small', {}, [p.apm ? Math.round(p.apm) + ' apm' : '', bl].filter(Boolean).join(' · ')));
+    });
+    const chipEls = [];
+    for (const t of tagsOf) {
+      if (t.pid != null && !['people'].includes(t.family)) continue;  // per-player builds and economy show on the game page
+      if (t.family === 'people' && t.tag === 'people:chat') continue;
+      const who = t.pid != null ? (players.find(p => p.pid === t.pid) || {}).name : null;
+      chipEls.push(h('span', { class: 'chip flat' + (tagState(t.tag) ? ' on' : ''), title: (who ? who + ': ' : '') + t.tag }, (who ? who + ': ' : '') + t.label));
+    }
+    box.append(h('div', { class: 'card', on: { click: () => openGame(g.rid) } },
+      h('div', { class: 'top' }, h('b', {}, g.map), h('span', {}, g.mode + ' · ' + fmt(g.duration_s)),
+        notes[g.id] && (mine.text || (mine.tags || []).length || (mine.marks || []).length) ? h('span', { class: 'chip mine flat' }, 'notes') : null,
+        h('span', { class: 'when' }, new Date(g.played_at).toLocaleString())),
+      h('div', { class: 'teams' }, ...teamEls),
+      h('div', { class: 'chips' }, ...chipEls.slice(0, 18))));
+  }
+  if (n > games.length) box.append(h('button', { on: { click: () => { S.shown += 60; renderList(); } } }, 'Show more (' + (n - games.length) + ' left)'));
+}
+
+/* -------------------------------------------------------------- folder tree */
+async function toggleTree() {
+  const t = $('#tree');
+  if (!t.hidden) { t.hidden = true; return; }
+  const root = await (await fetch('/api/tree')).json();
+  S.rootAbs = root.abs;
+  t.replaceChildren();
+  const draw = (n, depth) => {
+    const b = h('button', { class: 'tn' + (n.rel === S.folder ? ' cur' : ''), on: { click: () => { t.hidden = true; setFolder(n.rel); } } },
+      h('span', {}, (depth ? '└ ' : '') + n.name + (depth ? '' : '/')), h('small', {}, n.total ? n.total + ' replay(s)' : ''));
+    b.style.paddingLeft = (10 + depth * 16) + 'px';
+    t.append(b); n.kids.forEach(k => draw(k, depth + 1));
+  };
+  draw(root, 0); t.hidden = false;
+}
+function setFolder(rel) {
+  S.folder = rel;
+  $('#dir').value = S.rootAbs ? S.rootAbs + (rel ? '/' + rel : '') : rel;
+  $('#hists').replaceChildren();
+  showLib(); refresh();
+}
+$('#dir').onclick = $('#browse').onclick = toggleTree;
+document.addEventListener('click', e => { if (!e.target.closest('#tree,#dir,#browse')) $('#tree').hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#tree').hidden = true; });
+
+/* ---------------------------------------------------------------- game view */
+function showLib() { $('#lib').hidden = false; $('#game').hidden = true; location.hash = ''; }
+let current = null;
+function openGame(rid) {
+  const g = rows('select * from replays where rid=?', [rid])[0];
+  const players = rows('select * from players where rid=? order by team, pid', [rid]);
+  const data = {
+    g, players, rid,
+    stats: rows('select * from stats where rid=? order by t', [rid]),
+    apm: rows('select * from apm where rid=?', [rid]),
+    fights: rows('select * from fights where rid=? order by idx', [rid]),
+    losses: rows('select * from fight_losses where rid=?', [rid]),
+    steps: rows('select * from build_steps where rid=? order by pid, idx', [rid]),
+    timings: rows('select * from timings where rid=?', [rid]),
+    casts: rows('select pid, ability, grp, t from casts where rid=? order by t', [rid]),
+    chat: rows('select * from chat where rid=? order by t', [rid]),
+    tags: rows('select tid, pid, family, tag, kind, label, evidence from tags where rid=?', [rid]),
+    spans: rows('select s.tid, s.t0, s.t1 from tag_spans s join tags t using(tid) where t.rid=?', [rid]),
+    pick: new Map(),
+  };
+  current = data;
+  $('#lib').hidden = true; $('#game').hidden = false; $('#game').scrollTop = 0;
+  renderGame();
+}
+const COLORS = ['#e07a1f', '#2a9d8f', '#d1497b', '#7a5cd1', '#c9a227', '#3b7fb5', '#6aa84f', '#c0392b'];
+function activeTagList(d) {
+  const tags = [];
+  for (const f of S.tags) if (!f.neg) tags.push(f.tag);
+  for (const t of d.pick.keys()) if (!tags.includes(t)) tags.push(t);
+  return tags;
+}
+function renderGame() {
+  const d = current, box = $('#game'); box.replaceChildren();
+  const g = d.g, note = noteFor(g.id, g.fingerprint);
+  note.fp = g.fingerprint || note.fp;
+  const nameOf = pid => (d.players.find(p => p.pid === pid) || {}).name || '?';
+  box.append(h('div', { class: 'row' }, h('button', { on: { click: () => { showLib(); } } }, '← Back'),
+    h('span', { class: 'mono', style: 'color:var(--mut)' }, g.path)));
+  box.append(h('h2', {}, g.map + ' · ' + g.mode + ' · ' + fmt(g.duration_s)));
+  box.append(h('div', { class: 'sub' }, new Date(g.played_at).toLocaleString() + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : '')));
+
+  const pt = h('table', {}, h('tr', {}, ...['', 'Player', 'Team', 'Race', 'Result', 'MMR', 'APM', 'Build'].map(x => h('th', {}, x))));
+  for (const p of d.players) {
+    const b = d.tags.find(t => t.pid === p.pid && t.family === 'build');
+    const bl = d.tags.filter(t => t.pid === p.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => t.label).join(', ');
+    pt.append(h('tr', {}, h('td', {}, h('span', { class: 'race ' + (RACE[p.race] || '') }, RACE[p.race] || '?')),
+      h('td', {}, p.name + (p.clan ? ' [' + p.clan + ']' : '')), h('td', {}, 'T' + p.team), h('td', {}, p.race),
+      h('td', { class: p.result === 'Win' ? '' : '', style: 'color:' + (p.result === 'Win' ? 'var(--win)' : 'var(--loss)') }, p.result),
+      h('td', {}, p.mmr || '–'), h('td', {}, p.apm_blizzard ? Math.round(p.apm_blizzard) : '~' + Math.round(p.apm_est)),
+      h('td', { title: b ? b.evidence : '' }, bl || (b ? 'unnamed' : '–'))));
+  }
+  box.append(h('div', { class: 'panel' }, pt));
+
+  // tags on this game
+  const gtags = d.tags.filter(t => ['shape', 'spectacle', 'people'].includes(t.family));
+  if (gtags.length) box.append(h('div', { class: 'panel' }, h('h3', {}, 'What stands out'),
+    h('div', { class: 'chips' }, ...gtags.map(t => h('span', { class: 'chip flat', title: t.evidence }, (t.pid != null ? nameOf(t.pid) + ': ' : '') + t.label + (t.evidence ? ' · ' + t.evidence : ''))))));
+
+  const tlPanel = h('div', { class: 'panel' }, h('h3', {}, 'Timeline'),
+    h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:var(--acc)' }), 'APM (30 s)'), h('span', {}, h('i', { style: 'background:var(--sup)' }), 'Supply'),
+      h('span', {}, h('i', { style: 'background:var(--fgt)' }), 'Value killed + lost'), h('span', {}, h('i', { style: 'background:var(--ob)' }), 'Your marks'),
+      h('span', {}, 'Drag on the top ruler to add a mark')),
+    h('div', { id: 'markform', hidden: true, class: 'row', style: 'margin-bottom:8px' }),
+    h('div', { id: 'tl' }));
+  box.append(tlPanel);
+
+  const two = h('div', { class: 'two' });
+  // skills
+  const sk = h('div', { class: 'panel' }, h('h3', {}, 'Skills (click to show on the timeline)'));
+  for (const p of d.players) {
+    const by = new Map();
+    for (const c of d.casts) if (c.pid === p.pid) { const e = by.get(c.ability) || { n: 0, first: c.t, grp: c.grp }; e.n++; by.set(c.ability, e); }
+    if (!by.size) continue;
+    sk.append(h('div', { style: 'margin:6px 0 2px;font-weight:600' }, p.name));
+    sk.append(h('div', { class: 'chips' }, ...[...by.entries()].sort((a, b) => b[1].n - a[1].n).map(([ab, e]) => {
+      const tag = 'skill:' + ab, on = d.pick.has(tag) || S.tags.some(f => f.tag === tag && !f.neg);
+      return h('span', { class: 'chip' + (on ? ' on' : ''), title: 'first at ' + fmt(e.first) + (e.grp ? ' · group ' + e.grp : ''), on: { click: () => {
+        if (d.pick.has(tag)) d.pick.delete(tag); else d.pick.set(tag, true); renderGame(); } } }, ab, h('small', {}, 'x' + e.n));
+    })));
+  }
+  two.append(sk);
+  // fights
+  const ft = h('div', { class: 'panel' }, h('h3', {}, 'Fights'));
+  if (d.fights.length) {
+    const tb = h('table', {}, h('tr', {}, ...['When', 'Where', 'Lost value (team: main losses)'].map(x => h('th', {}, x))));
+    for (const f of d.fights) {
+      const ls = d.losses.filter(l => l.fight_idx === f.idx);
+      tb.append(h('tr', {}, h('td', { class: 'mono' }, fmt(f.t0) + '–' + fmt(f.t1)), h('td', { class: 'mono' }, f.x + ',' + f.y),
+        h('td', {}, ...ls.map(l => h('div', {}, 'T' + l.team + ' ' + l.value + (l.top_units ? ': ' + l.top_units : ''))))));
+    }
+    ft.append(tb);
+  } else ft.append(h('div', { class: 'empty' }, 'No fights detected.'));
+  two.append(ft);
+  box.append(two);
+
+  // build orders
+  const hitSet = matchedSteps(d);
+  const bo = h('div', { class: 'panel' }, h('h3', {}, 'Build orders'));
+  const tw = h('div', { class: 'two' });
+  for (const p of d.players) {
+    const col = h('div', {}, h('div', { style: 'font-weight:600' }, p.name + ' (' + p.race + ')'));
+    const tm = d.timings.filter(t => t.pid === p.pid);
+    if (tm.length) col.append(h('div', { class: 'chips', style: 'margin:4px 0' }, ...tm.map(t => h('span', { class: 'chip flat' }, (THING_LABEL[t.key] || t.key) + ' ' + fmt(t.t)))));
+    const ln = h('div', { class: 'steps' });
+    for (const s of d.steps.filter(s => s.pid === p.pid && s.t <= 600)) {
+      ln.append(h('div', { class: hitSet.has(p.pid + ':' + s.idx) ? 'hit' : '' }, fmt(s.t).padStart(5) + '  ' + String(s.supply).padStart(3) + '  ' + s.name + (s.nth > 1 && s.kind === 'struct' ? ' #' + s.nth : '') + (s.kind === 'research' || s.kind === 'morph' ? ' (' + s.kind + ')' : '')));
+    }
+    col.append(ln); tw.append(col);
+  }
+  bo.append(h('div', { style: 'color:var(--mut);font-size:12px;margin-bottom:4px' }, 'Time, supply (approximate, ±2–3), step. First 10 minutes.'), tw);
+  box.append(bo);
+
+  // chat
+  if (d.chat.length) {
+    box.append(h('div', { class: 'panel' }, h('h3', {}, 'Chat'),
+      h('table', {}, ...d.chat.map(c => h('tr', {}, h('td', { class: 'mono' }, fmt(c.t)), h('td', {}, c.pid != null ? nameOf(c.pid) : '–'), h('td', {}, (c.to_all ? '' : '[allies] ') + c.text))))));
+  }
+
+  // notes
+  const ta = h('textarea', { placeholder: 'Notes about this game…', value: note.text, on: { input: () => { note.text = ta.value; saveSoon(); } } });
+  const tg = h('input', { placeholder: 'your tags, comma separated (e.g. funny, clip)', value: (note.tags || []).join(', '), style: 'width:100%', on: { input: () => {
+    note.tags = tg.value.split(',').map(s => s.trim()).filter(Boolean); saveSoon(); } } });
+  const marks = h('div', {});
+  const drawMarks = () => {
+    marks.replaceChildren(...(note.marks || []).map((m, i) => h('div', { class: 'mark' },
+      h('span', { class: 'mono' }, fmt(m.t0) + '–' + fmt(m.t1)), h('span', { style: 'flex:1' }, m.text),
+      h('button', { on: { click: () => { note.marks.splice(i, 1); saveNotes(); renderGame(); } } }, '✕'))));
+    if (!(note.marks || []).length) marks.append(h('div', { style: 'color:var(--mut)' }, 'No marks yet.'));
+  };
+  drawMarks();
+  box.append(h('div', { class: 'panel' }, h('h3', {}, 'Your notes (saved in this browser)'), ta, h('div', { style: 'margin:8px 0' }, tg), h('h3', {}, 'Marks'), marks));
+
+  drawTimeline(d, note);
+}
+let saveTimer = 0;
+function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNotes, 400); }
+
+function matchedSteps(d) {
+  const hit = new Set();
+  for (const c of S.conds) {
+    if (c.kind !== 'step' || c.a === null || c.a === undefined) continue;
+    for (const s of d.steps) {
+      if (s.name !== c.name || (c.nth && s.nth !== c.nth)) continue;
+      const ok = c.op === 'before' ? s.t < c.a : c.op === 'after' ? s.t >= c.a : c.op === 'between' ? s.t >= c.a && s.t <= Math.max(c.a, c.b)
+        : c.op === 'sup<=' ? s.supply <= c.a : s.supply >= c.a;
+      if (ok) hit.add(s.pid + ':' + s.idx);
+    }
+  }
+  return hit;
+}
+
+/* -------------------------------------------------------------- timeline svg */
+function drawTimeline(d, note) {
+  const el = $('#tl'); el.replaceChildren();
+  const dur = d.g.duration_s, labW = 120, W = Math.max(640, el.clientWidth), plotW = W - labW - 12;
+  const X = t => labW + t / dur * plotW;
+  const laneH = 30, gap = 4;
+  const maxApm = Math.max(1, ...d.apm.map(a => a.n));
+  const deltas = new Map();
+  for (const p of d.players) {
+    const st = d.stats.filter(s => s.pid === p.pid), out = [];
+    st.forEach((s, i) => { const prev = st[i - 1]; out.push({ t: s.t, v: prev ? Math.max(0, (s.killed - prev.killed) + (s.lost - prev.lost)) : 0, w: prev ? s.t - prev.t : 0 }); });
+    deltas.set(p.pid, out);
+  }
+  const maxFgt = Math.max(1, ...[...deltas.values()].flat().map(x => x.v));
+  const ann = activeTagList(d);
+  let y = 22, svg = '', bands = '';
+  const lbl = (yy, text) => `<text x="${labW - 6}" y="${yy + laneH - 4}" font-size="10" text-anchor="end" fill="var(--mut)">${text}</text>`;
+  const lanes = [];
+  // ruler
+  const step = dur > 1500 ? 300 : dur > 600 ? 120 : 60;
+  let ruler = `<rect x="${labW}" y="0" width="${plotW}" height="18" fill="var(--bar)" id="ruler"/>`;
+  for (let t = 0; t <= dur; t += step) ruler += `<text x="${X(t) + 3}" y="13" font-size="11" fill="var(--mut)">${fmt(t)}</text><line x1="${X(t)}" x2="${X(t)}" y1="0" y2="@H@" stroke="var(--line)" stroke-width="1"/>`;
+  for (const p of d.players) {
+    svg += `<text x="4" y="${y + 12}" font-size="12" font-weight="600" fill="var(--fg)">${esc(p.name.slice(0, 14))}</text><text x="4" y="${y + 26}" font-size="11" fill="var(--mut)">${esc(p.race)} · T${p.team} · ${esc(p.result)}</text>`;
+    const top = y;
+    // apm lane
+    for (const a of d.apm.filter(a => a.pid === p.pid)) {
+      const bh = a.n / maxApm * laneH, x0 = X(a.bucket * 30), w = Math.max(1, X(30) - X(0) - 1);
+      svg += `<rect x="${x0}" y="${y + laneH - bh}" width="${w}" height="${bh}" fill="var(--acc)" opacity=".75"/>`;
+    }
+    y += laneH + gap;
+    svg += lbl(y - laneH - gap, 'APM');
+    // supply lane
+    const st = d.stats.filter(s => s.pid === p.pid);
+    if (st.length) {
+      let path = `M${X(st[0].t)},${y + laneH}`;
+      for (const s of st) path += ` L${X(s.t)},${y + laneH - Math.min(1, s.food_used / 200) * laneH}`;
+      path += ` L${X(st[st.length - 1].t)},${y + laneH} Z`;
+      svg += `<path d="${path}" fill="var(--sup)" opacity=".55"/>`;
+    }
+    svg += lbl(y, 'supply');
+    y += laneH + gap;
+    // fight intensity lane
+    for (const f of deltas.get(p.pid)) {
+      if (!f.v) continue;
+      const bh = f.v / maxFgt * laneH;
+      svg += `<rect x="${X(f.t - f.w)}" y="${y + laneH - bh}" width="${Math.max(1, X(f.w) - X(0))}" height="${bh}" fill="var(--fgt)" opacity=".8"/>`;
+    }
+    svg += lbl(y, 'fights');
+    y += laneH + gap;
+    // annotation lane
+    if (ann.length) {
+      svg += `<text x="${labW - 6}" y="${y + 11}" font-size="10" text-anchor="end" fill="var(--mut)">filters</text>`;
+      ann.forEach((tag, i) => {
+        const col = COLORS[i % COLORS.length];
+        for (const t of d.tags.filter(t => t.tag === tag && t.pid === p.pid)) for (const s of d.spans.filter(s => s.tid === t.tid)) {
+          svg += `<rect x="${X(s.t0) - 1.5}" y="${y}" width="${Math.max(3, X(s.t1) - X(s.t0) + 3)}" height="14" rx="2" fill="${col}"><title>${esc(tag)} ${fmt(s.t0)}</title></rect>`;
+        }
+      });
+      y += 14 + gap;
+    }
+    svg += `<line x1="0" x2="${W}" y1="${y - gap / 2 + 2}" y2="${y - gap / 2 + 2}" stroke="var(--line)"/>`;
+    y += 8;
+    lanes.push([top, y]);
+  }
+  const H = y + 4;
+  for (const f of d.fights) bands += `<rect x="${X(f.t0)}" y="18" width="${Math.max(2, X(f.t1) - X(f.t0))}" height="${H - 18}" fill="var(--fgt)" opacity=".12"><title>fight ${fmt(f.t0)}–${fmt(f.t1)}</title></rect>`;
+  for (const m of note.marks || []) bands += `<rect x="${X(m.t0)}" y="0" width="${Math.max(2, X(m.t1) - X(m.t0))}" height="${H}" fill="var(--ob)" opacity=".22"><title>${esc(m.text || 'mark')} ${fmt(m.t0)}–${fmt(m.t1)}</title></rect>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="18" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" /><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0"/></svg>`;
+  if (ann.length) {
+    const lg = h('div', { class: 'legend', style: 'margin-top:6px' }, ...ann.map((t, i) => h('span', {}, h('i', { style: 'background:' + COLORS[i % COLORS.length] }), t)));
+    el.append(lg);
+  }
+  const svgEl = el.querySelector('svg'), tip = h('div', { id: 'tip', hidden: true });
+  el.append(tip);
+  const tAt = ev => { const r = svgEl.getBoundingClientRect(); return Math.min(dur, Math.max(0, (ev.clientX - r.left - labW) / plotW * dur)); };
+  let dragFrom = null;
+  svgEl.addEventListener('mousemove', ev => {
+    const t = tAt(ev), r = svgEl.getBoundingClientRect(), px = ev.clientX - r.left;
+    const cur = svgEl.querySelector('#cur'); cur.setAttribute('x1', px); cur.setAttribute('x2', px); cur.setAttribute('opacity', px > labW ? .5 : 0);
+    if (dragFrom !== null) { const a = Math.min(dragFrom, t), b = Math.max(dragFrom, t); const dr = svgEl.querySelector('#drag'); dr.setAttribute('x', X(a)); dr.setAttribute('width', X(b) - X(a)); }
+    const lines = [fmt(t)];
+    for (const p of d.players) {
+      const st = d.stats.filter(s => s.pid === p.pid); let near = null;
+      for (const s of st) if (s.t <= t) near = s;
+      if (near) lines.push(p.name.slice(0, 12).padEnd(12) + ' sup ' + String(near.food_used).padStart(3) + '/' + near.food_made + '  wk ' + near.workers + '  bank ' + (near.min_bank + near.gas_bank) + '  army ' + near.army_value);
+    }
+    tip.textContent = lines.join('\n'); tip.hidden = false;
+    tip.style.left = Math.min(px + 14, W - 380) + 'px'; tip.style.top = '24px';
+  });
+  svgEl.addEventListener('mouseleave', () => { tip.hidden = true; svgEl.querySelector('#cur').setAttribute('opacity', 0); });
+  svgEl.addEventListener('mousedown', ev => { const r = svgEl.getBoundingClientRect(); if (ev.clientY - r.top <= 18 && ev.clientX - r.left > labW) { dragFrom = tAt(ev); ev.preventDefault(); } });
+  window.onmouseup = ev => {
+    if (dragFrom === null) return;
+    const t = tAt(ev), a = Math.min(dragFrom, t), b = Math.max(dragFrom, t); dragFrom = null;
+    svgEl.querySelector('#drag').setAttribute('width', 0);
+    if (b - a < 2) return;
+    const form = $('#markform'); form.hidden = false;
+    const txt = h('input', { placeholder: 'what happens here?', style: 'flex:1;min-width:200px' });
+    form.replaceChildren(h('span', { class: 'mono' }, fmt(a) + '–' + fmt(b)), txt,
+      h('button', { class: 'pri', on: { click: () => { (note.marks ||= []).push({ t0: Math.round(a), t1: Math.round(b), text: txt.value.trim() }); saveNotes(); renderGame(); } } }, 'Add mark'),
+      h('button', { on: { click: () => { form.hidden = true; } } }, 'Cancel'));
+    txt.focus();
+  };
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+window.addEventListener('resize', () => { if (current && !$('#game').hidden) { const note = noteFor(current.g.id, current.g.fingerprint); drawTimeline(current, note); } });
+
+/* ------------------------------------------------------------------ startup */
+function toast(m, warn) { const s = $('#status'); s.textContent = m; s.classList.toggle('warn', !!warn); }
+$('#rescan').onclick = async () => { await fetch('/api/rescan', { method: 'POST' }); poll(); };
+async function poll() {
+  let st;
+  try { st = await (await fetch('/api/status', { cache: 'no-store' })).json(); } catch { return; }
+  S.rootAbs = st.root;
+  if (!$('#dir').value) $('#dir').value = st.root;
+  if (st.scanning) {
+    $('#status').classList.remove('warn');
+    $('#status').textContent = 'Scanning ' + st.done + '/' + st.total + '…';
+    if (st.version !== loadedVersion && Date.now() - loadedAt > 4000) await reload(st.version);
+  } else if (st.version !== loadedVersion) {
+    await reload(st.version);
+    if (st.errors.length) console.warn(st.errors.join('\n'));
+  }
+}
+async function reload(version) {
+  try {
+    await loadDb(); loadedVersion = version; thingOptions = null;
+    $('#hists').replaceChildren();
+    if ($('#game').hidden) refresh();  // an open game keeps showing the data it already loaded
+  } catch (e) { toast(e.message, true); console.error(e); }
+}
+
+try {
+  loadNotes();
+  sqlite3 = await sqlite3InitModule();
+  await poll();
+  setInterval(poll, 1500);
+} catch (e) {
+  toast('Startup failed: ' + e.message, true); console.error(e);
+}
+</script></body></html>
