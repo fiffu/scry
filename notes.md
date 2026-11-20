@@ -205,3 +205,26 @@ Skill groups as a quick selector (not built, needs a decision):
 - Today a group tag already means "any ability in the group", computed when the replay is parsed.
 - A true multi-select needs a rule for several skills at once. Tag filters currently AND. A quick selector wants "any of these". Choosing OR inside the Skills list would also change what two clicked skills mean.
 - Other facet lists (builds, skills and so on) still reorder by count while filtering. Only the player list was made stable.
+
+## UI feedback round 3: the game page (2026-11-21)
+
+Skill groups are gone, because a hand-made table is a poor fit. Removed `SKILL_GROUPS`, `GROUP_OF`, `GROUP_LABEL`, the `group:` tags and the `grp` column of `casts` (the schema changed, so the parser version is now 6). The "quick selector" idea is dropped with them, so the OR-or-AND question is moot.
+
+Game page changes:
+- The back button is primary-coloured and sticky. It lives in a bar that is a direct child of the scrolling container (`.backbar`). Sticky only works there, not inside a small wrapper. `top:-14px` cancels the container's top padding. Without it, scrolled content shows above the bar.
+- Players: same team columns as the library cards (name colour, race badge, clan, MMR, build pills). The APM column is gone. Build pills apply the filter and return to the library.
+- "What stands out" is now "Highlights", a table of pill and description. The description is the tag's `evidence` text, now written by the parser in short form with real singular and plural (`plural()`, `times_text()` in `scry.py`). Example: "72% of value destroyed at 11:34", "2 town halls destroyed at 9:51, 12:17", "1 fight of 5,000+ value at 11:34".
+- Timeline: APM is a line with a point per 30 s, joined by straight lines. A 30 s bucket with no actions is a real 0 point, not skipped. The "fights" lane label is now "losses".
+- Skills: the panel is grouped by race. A click puts a row at the bottom of the timeline, one pip per use, coloured by player. Hovering a pip shows the skill name and player, and dims all other players' pips in every row. Skills used as library filters start switched on. Other active filters keep the thin "filters" lane under each player.
+- Build orders: one table, one column per player, one row per second. Steps from different players at the same second share a row. The `#n` counter is gone. The supply number stays in front of each step. Matching conditions still highlight the cell. Only the first 10 minutes are shown.
+- Chat: narrow time column, bold coloured names (the same colour as everywhere else), no row lines.
+- A file name chip (`fileChip()`) sits left of the date on library cards and below the heading on the game page. The folder path is in the tooltip.
+
+Bug found by testing: the invisible crosshair line followed the pointer and sat on top of the pip under it, so the pip never received hover (the tooltip showed, the dimming did not). The crosshair and the drag box now have `pointer-events="none"`.
+
+Checked: 4 APM lines with 44 points each (zero buckets kept), no "fights" label, 49 pips for two skills in two player colours, others dim to 0.12 on hover and return to 1, build table cells equal the 195 steps in the database, chat time column 51 px wide, name colour the same in the players block and in chat, a pill on the game page returns to the library with the filter set, the sticky button stays at the same screen position after scrolling to the end. The static site test passes too.
+
+Open points:
+- Hardcoded lists remain: the ability noise filter (`NOISE_EXACT`, `NOISE_PREFIX`) decides what counts as a skill, `SKILL_INFO` and `TAG_INFO` hold tooltip text, and `SYN` holds search synonyms. A missing entry only loses a nicety, except the noise filter, which decides what counts as a skill.
+- Marks are bookmarks on the timeline: a time range with a note, saved with the game in the browser. They may need a clearer name.
+- The build table shows only the first 10 minutes, as before. There is no "whole game" switch yet.

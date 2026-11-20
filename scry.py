@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 5  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 6  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -71,25 +71,6 @@ NOISE_EXACT = {
 NOISE_PREFIX = ('Build', 'Train', 'Morph', 'Research', 'Upgrade', 'Evolve', 'Cancel', 'Lift', 'Land',
                 'WarpIn', 'Rally', 'Select', 'Load', 'Unload')
 
-# Hand-made groups so a viewer can search "detection" without knowing ability names.
-SKILL_GROUPS = {
-    'macro': {'CalldownMULE', 'ChronoBoostEnergyCost', 'SpawnLarva', 'ExtraSupplies', 'EnergyRecharge'},
-    'creep': {'CreepTumor', 'GenerateCreep'},
-    'detection': {'ScannerSweep', 'OracleRevelation', 'SpawnChangeling'},
-    'nuke': {'TacticalNukeStrike'},
-    'stim': {'UseStimpack', 'StimpackRedirect'},
-    'spell': {'GravitonBeam', 'ForceField', 'PsionicStorm', 'InfestorNeuralParasite', 'FungalGrowth',
-              'QueenTransfusion', 'EMPRound', 'PrismaticAlignment', 'HallucinatePhoenix', 'KD8Charge',
-              'AmorphousArmorcloud', 'SpawnLocustsTargeted', 'OracleWeapon'},
-    'mode': {'SiegeMode', 'TankMode', 'PhasingMode', 'TransportMode', 'BurrowWidowMine', 'UnburrowWidowMine',
-             'BurrowInfestor', 'UnburrowInfestor', 'CloakGhost', 'OracleWeaponOff',
-             'OverseerMorphtoOverseerSiegeMode'},
-    'boost': {'MedivacSpeedBoost', 'HydraliskFrenzy'},
-}
-GROUP_OF = {a: g for g, names in SKILL_GROUPS.items() for a in names}
-# Plural names for the filter list: picking one means "any ability in the group".
-GROUP_LABEL = {'macro': 'macro abilities', 'creep': 'creep tumors', 'detection': 'detection abilities', 'nuke': 'nukes',
-               'stim': 'stims', 'spell': 'spells', 'mode': 'mode switches', 'boost': 'speed boosts'}
 # Words that get their own social tag when a player types them in chat (case does not matter).
 CHAT_WORDS = ('cyka', 'blyat')
 
@@ -188,6 +169,15 @@ class Tags:
             self.rows.append((pid, family, tag, kind, label or str(name), evidence))
         for s in spans:
             self.spans.append((pid, tag, s[0], s[1]))
+
+
+def plural(n, word):
+    return '%d %s' % (n, word if n == 1 else word + 's')
+
+
+def times_text(ts, limit=5):
+    shown = ', '.join(mmss(t) for t in ts[:limit])
+    return shown + (' +%d more' % (len(ts) - limit) if len(ts) > limit else '')
 
 
 def mmss(sec):
@@ -448,9 +438,9 @@ def parse_replay(path):
     tg = Tags()
     tg.add(None, 'map', r.map_name, 'exact', r.map_name)
     if dur >= CFG['long_game_s']:
-        tg.add(None, 'shape', 'long', 'inferred', 'long game', 'lasted %s' % mmss(dur))
+        tg.add(None, 'shape', 'long', 'inferred', 'long game', 'Lasted %s' % mmss(dur))
     if dur < CFG['short_game_s']:
-        tg.add(None, 'shape', 'short', 'inferred', 'short game', 'lasted %s' % mmss(dur))
+        tg.add(None, 'shape', 'short', 'inferred', 'short game', 'Lasted %s' % mmss(dur))
 
     team_loss = {tn: sum(d['value'] for d in deaths if d['team'] == tn) for tn in teams}
     if len(teams) >= 2:
@@ -458,24 +448,24 @@ def parse_replay(path):
         lo, hi = ranked[0], ranked[-1]
         if hi[1] >= CFG['stomp_min_loss'] and hi[1] >= CFG['stomp_ratio'] * max(lo[1], 1):
             tg.add(None, 'shape', 'stomp', 'inferred', 'stomp',
-                   'team %d lost %d, team %d lost %d' % (hi[0], hi[1], lo[0], lo[1]))
+                   'Team %d lost %s, team %d lost %s' % (hi[0], format(hi[1], ','), lo[0], format(lo[1], ',')))
     fvals = []
     for i, f in enumerate(fights):
         fvals.append((i, sum(d['value'] for d in f)))
     total_fight = sum(v for _, v in fvals)
     if len(fights) >= CFG['slugfest_fights']:
-        tg.add(None, 'shape', 'slugfest', 'inferred', 'slugfest', '%d fights' % len(fights),
+        tg.add(None, 'shape', 'slugfest', 'inferred', 'slugfest', plural(len(fights), 'fight'),
                [(f[0]['t'], f[-1]['t']) for f in fights])
     if fvals:
         bi, bv = max(fvals, key=lambda x: x[1])
         if bv >= CFG['one_big_min'] and bv >= CFG['one_big_share'] * total_fight:
             tg.add(None, 'shape', 'one-big-battle', 'inferred', 'one big battle',
-                   'one fight holds %d of %d lost value (%s)' % (bv, total_fight, mmss(fights[bi][0]['t'])),
+                   '%d%% of value destroyed at %s' % (round(100 * bv / total_fight), mmss(fights[bi][0]['t'])),
                    [(fights[bi][0]['t'], fights[bi][-1]['t'])])
         bigs = [(f[0]['t'], f[-1]['t']) for f, (_, v) in zip(fights, fvals) if v >= CFG['big_fight']]
         if bigs:
             tg.add(None, 'spectacle', 'big-fight', 'inferred', 'big fight',
-                   '%d fight(s) of %d+ lost value' % (len(bigs), CFG['big_fight']), bigs)
+                   '%s of %s+ value at %s' % (plural(len(bigs), 'fight'), format(CFG['big_fight'], ','), times_text([b[0] for b in bigs])), bigs)
     # lead flips: which team lost more in each sizable fight
     losers = []
     for i, f in enumerate(fights):
@@ -487,16 +477,16 @@ def parse_replay(path):
     flips = sum(1 for a, b in zip(losers, losers[1:]) if a[0] != b[0])
     if flips >= CFG['flip_min_fights'] - 1 and len(losers) >= CFG['flip_min_fights']:
         tg.add(None, 'shape', 'back-and-forth', 'inferred', 'back and forth',
-               'the losing side changed %d times over %d fights' % (flips, len(losers)))
+               'Losing side changed %s over %s' % (plural(flips, 'time'), plural(len(losers), 'fight')))
 
     kills = sorted(hall_deaths, key=lambda h: h['t'])
     if kills:
-        tg.add(None, 'spectacle', 'base-kill', 'inferred', 'base kill', '%d town hall(s) destroyed' % len(kills),
+        tg.add(None, 'spectacle', 'base-kill', 'inferred', 'base kill', '%s destroyed at %s' % (plural(len(kills), 'town hall'), times_text([k['t'] for k in kills])),
                [(k['t'], k['t']) for k in kills])
         for a in kills:
             if any(b['team'] != a['team'] and abs(b['t'] - a['t']) <= CFG['base_trade_window_s'] for b in kills):
                 tg.add(None, 'spectacle', 'base-trade', 'inferred', 'base trade',
-                       'both teams lost a town hall within %ds (around %s)' % (CFG['base_trade_window_s'], mmss(a['t'])),
+                       'Both teams lost a town hall around %s' % mmss(a['t']),
                        [(a['t'], a['t'])])
                 break
 
@@ -511,9 +501,6 @@ def parse_replay(path):
         for t, ab in cmds[pid]:
             counts[ab] += 1
             tg.add(pid, 'skill', ab, 'exact', ab, '', [(t, t)])
-            g = GROUP_OF.get(ab)
-            if g:
-                tg.add(pid, 'group', g, 'exact', GROUP_LABEL.get(g, g), '', [(t, t)])
         for u in sorted({u['name'] for u in born[pid]}):
             tg.add(pid, 'unit', u, 'exact', u, '', [(min(x['t'] for x in born[pid] if x['name'] == u),) * 2])
         for q, t, n in upgrades:
@@ -521,7 +508,7 @@ def parse_replay(path):
                 tg.add(pid, 'upgrade', n, 'exact', n, '', [(t, t)])
         cap = [e.frame / FPS for e in st if e.food_used >= 200]
         if cap:
-            tg.add(pid, 'econ', 'maxed-out', 'inferred', 'maxed out', '200 supply from %s' % mmss(cap[0]),
+            tg.add(pid, 'econ', 'maxed-out', 'inferred', 'maxed out', 'Reached 200 supply at %s' % mmss(cap[0]),
                    [(cap[0], cap[-1])])
         run, spans = [], []
         for e in st + [None]:
@@ -533,15 +520,15 @@ def parse_replay(path):
                 run = []
         if spans:
             tg.add(pid, 'econ', 'floating-bank', 'inferred', 'floating bank',
-                   'minerals above %d for %s' % (CFG['float_bank'], mmss(sum(b - a for a, b in spans))), spans)
+                   'Over %s minerals banked for %s' % (format(CFG['float_bank'], ','), mmss(sum(b - a for a, b in spans))), spans)
         third = next((v for q, k, v in timing_rows if q == pid and k == 'third_base'), None)
         if third is not None and third < CFG['fast_third_s']:
-            tg.add(pid, 'econ', 'fast-third', 'inferred', 'fast third', 'third base started at %s' % mmss(third),
+            tg.add(pid, 'econ', 'fast-third', 'inferred', 'fast third', 'Third base at %s' % mmss(third),
                    [(third, third)])
         lv = leaves.get(pid)
         if lv is not None and dur - lv >= CFG['leaver_gap_s']:
             tg.add(pid, 'social', 'leaver', 'inferred', 'left early',
-                   'left at %s, game ended %s' % (mmss(lv), mmss(dur)), [(lv, lv)])
+                   'Left at %s, game ended %s' % (mmss(lv), mmss(dur)), [(lv, lv)])
 
     chat_rows = []
     for m in r.messages:
@@ -552,12 +539,12 @@ def parse_replay(path):
         chat_rows.append((pid, m.frame / FPS, text, 1 if getattr(m, 'to_all', True) else 0))
     late = [c for c in chat_rows if c[1] >= CFG['chat_after_s']]
     if late:
-        tg.add(None, 'social', 'chat', 'inferred', 'has chat', '%d message(s) after %s' % (len(late), mmss(CFG['chat_after_s'])),
+        tg.add(None, 'social', 'chat', 'inferred', 'has chat', '%s after %s' % (plural(len(late), 'message'), mmss(CFG['chat_after_s'])),
                [(c[1], c[1]) for c in late])
     add_chat_word_tags(tg, chat_rows)
 
     winner = r.winner.number if r.winner else None
-    cast_rows = [(p.pid, ab, GROUP_OF.get(ab, ''), t) for p in players for t, ab in cmds[p.pid]]
+    cast_rows = [(p.pid, ab, t) for p in players for t, ab in cmds[p.pid]]
     return dict(
         replay=dict(fingerprint=hashlib.sha1(('%s|%s' % (r.start_time.isoformat(), sorted(keys.values()))).encode()).hexdigest()[:16],
                     map=r.map_name, mode=r.type, category=r.category, build=r.build,
@@ -595,7 +582,7 @@ create table players(rid int, pid int, toon text, name text, clan text, team int
     mmr int, apm_blizzard real, apm_est real, primary key(rid, pid));
 create table tags(tid integer primary key, rid int, pid int, family text, tag text, kind text, label text, evidence text);
 create table tag_spans(tid int, t0 real, t1 real);
-create table casts(rid int, pid int, ability text, grp text, t real);
+create table casts(rid int, pid int, ability text, t real);
 create table build_steps(rid int, pid int, idx int, t real, supply int, kind text, name text, nth int);
 create table timings(rid int, pid int, key text, t real);
 create table fights(rid int, idx int, t0 real, t1 real, x int, y int);
@@ -614,7 +601,7 @@ create index i_players on players(toon);
 '''
 # How a parsed record maps onto tables: (table, key in the record, columns after rid).
 # The browser backend reads this from manifest.json, so both writers share one layout.
-REC_TABLES = (('players', 'players', 10), ('stats', 'stats', 12), ('casts', 'casts', 4),
+REC_TABLES = (('players', 'players', 10), ('stats', 'stats', 12), ('casts', 'casts', 3),
               ('build_steps', 'steps', 7), ('timings', 'timings', 3), ('fights', 'fights', 5),
               ('fight_losses', 'losses', 4), ('apm', 'apm', 3), ('chat', 'chat', 4))
 REPLAY_FIELDS = ('map', 'mode', 'category', 'build', 'played_at', 'duration_s', 'winner_team')

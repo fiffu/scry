@@ -72,7 +72,9 @@ summary small{color:var(--mut);font-weight:400}
 .card .top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
 .card .top b{font-size:15px}
 .card .top span{color:var(--mut)}
-.card .when{margin-left:auto}
+.card .right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.chip.file{max-width:300px;min-height:22px;padding:0 8px;font:11.5px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+.chip.file .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .teams{display:grid;margin:8px 0 10px}
 .team{min-width:0;padding:0 16px;display:flex;flex-direction:column;gap:3px}
 .team:first-child{padding-left:0}
@@ -87,6 +89,7 @@ summary small{color:var(--mut);font-weight:400}
 .empty{color:var(--mut);padding:24px;text-align:center}
 #game{flex:1;min-height:0;overflow-y:auto;padding:14px 18px 40px}
 #game h2{margin:0 0 4px}
+.backbar{position:sticky;top:-14px;z-index:20;background:var(--bg);margin:-14px -18px 14px;padding:10px 18px}
 .sub{color:var(--mut);margin-bottom:12px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
 .panel h3{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
@@ -102,6 +105,20 @@ th{color:var(--mut);font-weight:600;font-size:12px}
 .steps .hit{background:var(--accbg);border-radius:3px;outline:1px solid var(--acc)}
 .legend{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-bottom:6px;flex-wrap:wrap}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+table.plain td,table.plain th{border-bottom:0}
+.hi td{padding:3px 14px 3px 0;vertical-align:middle}
+.hi td:first-child{width:1%;white-space:nowrap}
+.chat td{padding:2px 12px 2px 0}
+.chat td.t,.chat td.who{width:1%;white-space:nowrap}
+.bo{table-layout:fixed}
+.bo th{padding:4px 8px;font-size:13px;color:var(--fg)}
+.bo td{padding:2px 8px;vertical-align:top;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.bo th.t,.bo td.t{width:54px;color:var(--mut)}
+.bo .sep{border-left:1px solid var(--line)}
+.bo td.hit{background:var(--accbg);box-shadow:inset 0 0 0 1px var(--acc)}
+.bo tr.kt td{border-bottom:1px solid var(--line);padding-bottom:6px}
+.bo .sup{display:inline-block;min-width:2.4em;margin-right:6px;color:var(--mut);text-align:right}
+.pip{transition:opacity .08s}
 .mark{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
 .mu .side{display:flex;flex-direction:column;gap:4px}
@@ -193,6 +210,10 @@ const likeEsc = s => s.replace(/[\\%_]/g, c => '\\' + c);
 const ftsq = s => '"' + s.replace(/"/g, '""') + '"';
 const RACE = { Terran: 'T', Protoss: 'P', Zerg: 'Z' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/* The file name as a chip. The folder path is in the tooltip. */
+function fileChip(path) {
+  return h('span', { class: 'chip flat file', title: path }, h('span', { class: 'fn' }, path.split('/').pop()));
+}
 function fmtDate(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
 
 /* Each player keeps one colour everywhere. The hue comes from a hash of the player id, so it never changes. */
@@ -236,14 +257,6 @@ const TAG_INFO = {
   'build:stargate-opener': 'Protoss: a stargate before 3:30.',
   'build:robo-opener': 'Protoss: a robotics facility before 4:00.',
   'build:unnamed': 'No known opening matched. Open the game to see the build order.',
-  'group:macro': 'Economy abilities: MULE, chrono boost, injects, extra supplies.',
-  'group:creep': 'Spreading creep with tumors.',
-  'group:detection': 'Revealing hidden units: scans, oracle revelation, changelings.',
-  'group:nuke': 'A ghost calling down a nuclear strike.',
-  'group:stim': 'Using stimpack.',
-  'group:spell': 'Spellcaster abilities such as storm, fungal, neural parasite, force field.',
-  'group:mode': 'Switching unit modes: siege, burrow, cloak, phasing.',
-  'group:boost': 'Speed boosts such as the medivac afterburners.',
 };
 const SKILL_INFO = {
   CalldownMULE: 'Orbital command calls down a MULE to mine minerals.', ScannerSweep: 'Orbital command scans an area and reveals hidden units.',
@@ -268,6 +281,13 @@ function describe(tag, label) {
   if (fam === 'map') return 'Played on ' + name + '.';
   if (fam === 'mine') return 'Your own tag.';
   return label || tag;
+}
+/* A tag as a pill. A click applies it as a filter. On the game page it also goes back to the library. */
+function tagPill(t, { cls = '', text = '', goBack = false } = {}) {
+  const st = tagState(t.tag);
+  return h('span', { class: 'chip' + (cls ? ' ' + cls : '') + (st ? ' on' : ''),
+    title: describe(t.tag, t.label) + (t.evidence ? ' (' + t.evidence + ')' : ''),
+    on: { click: e => { e.stopPropagation(); toggleInclude(t.tag); if (goBack) showLib(); } } }, text || t.label);
 }
 function toggleInclude(tag) {
   const f = tagState(tag);
@@ -545,9 +565,9 @@ $('#scope').onchange = e => { S.scope = e.target.checked; refresh(); };
 
 /* ---- facets */
 const FAMS = [['build', 'Builds', ['build']], ['unit', 'Units', ['unit']], ['upgrade', 'Upgrades', ['upgrade']],
-  ['skill', 'Skills', ['skill']], ['group', 'Skill groups', ['group']], ['highlights', 'Game highlights', ['shape', 'spectacle']],
+  ['skill', 'Skills', ['skill']], ['highlights', 'Game highlights', ['shape', 'spectacle']],
   ['econ', 'Economy', ['econ']], ['social', 'Social', ['social']], ['mine', 'Mine', ['mine']]];
-const openFams = new Set(['build', 'group', 'highlights']);
+const openFams = new Set(['build', 'highlights']);
 const famAll = new Set();
 function tagState(tag) { return S.tags.find(f => f.tag === tag); }
 function renderFacets() {
@@ -759,12 +779,7 @@ function renderList() {
     const players = pls[g.rid] || [];
     const tagsOf = tgs[g.rid] || [];
     // A pill applies its tag as a filter. stopPropagation keeps the click from opening the game.
-    const pill = (t, cls, text) => {
-      const st = tagState(t.tag);
-      return h('span', { class: 'chip' + (cls ? ' ' + cls : '') + (st ? ' on' : ''),
-        title: describe(t.tag, t.label) + (t.evidence ? ' (' + t.evidence + ')' : ''),
-        on: { click: e => { e.stopPropagation(); toggleInclude(t.tag); } } }, text || t.label);
-    };
+    const pill = (t, cls, text) => tagPill(t, { cls, text });
     const line = pl => h('div', { class: 'pl' },
       h('span', { class: 'race ' + (RACE[pl.race] || '') }, RACE[pl.race] || '?'),
       h('span', { class: 'nm', style: 'color:' + plColor(pl), title: pl.name }, pl.name),
@@ -788,7 +803,7 @@ function renderList() {
     box.append(h('div', { class: 'card', on: { click: () => openGame(g.rid) } },
       h('div', { class: 'top' }, h('b', {}, g.map), h('span', {}, g.mode + ' · ' + fmt(g.duration_s)),
         notes[g.id] && (mine.text || (mine.tags || []).length || (mine.marks || []).length) ? h('span', { class: 'chip mine flat' }, 'notes') : null,
-        h('span', { class: 'when', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at))),
+        h('span', { class: 'right' }, fileChip(g.path), h('span', { class: 'when', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at)))),
       h('div', { class: 'teams', style: 'grid-template-columns:repeat(' + Math.max(1, teamNums.length) + ',minmax(0,1fr))' }, ...teamEls),
       h('div', { class: 'chips' }, ...chipEls.slice(0, 18))));
   }
@@ -834,11 +849,11 @@ function openGame(rid) {
     losses: rows('select * from fight_losses where rid=?', [rid]),
     steps: rows('select * from build_steps where rid=? order by pid, idx', [rid]),
     timings: rows('select * from timings where rid=?', [rid]),
-    casts: rows('select pid, ability, grp, t from casts where rid=? order by t', [rid]),
+    casts: rows('select pid, ability, t from casts where rid=? order by t', [rid]),
     chat: rows('select * from chat where rid=? order by t', [rid]),
     tags: rows('select tid, pid, family, tag, kind, label, evidence from tags where rid=?', [rid]),
     spans: rows('select s.tid, s.t0, s.t1 from tag_spans s join tags t using(tid) where t.rid=?', [rid]),
-    pick: new Map(),
+    pick: new Map(S.tags.filter(f => f.tag.startsWith('skill:')).map(f => [f.tag, true])),  // skills shown on the timeline
   };
   current = data;
   $('#lib').hidden = true; $('#game').hidden = false; $('#game').scrollTop = 0;
@@ -851,53 +866,70 @@ function activeTagList(d) {
   for (const t of d.pick.keys()) if (!tags.includes(t)) tags.push(t);
   return tags;
 }
+const sortedPlayers = list => list.slice().sort((a, b) => a.team - b.team || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 function renderGame() {
   const d = current, box = $('#game'); box.replaceChildren();
   const g = d.g, note = noteFor(g.id, g.fingerprint);
   note.fp = g.fingerprint || note.fp;
-  const nameOf = pid => (d.players.find(p => p.pid === pid) || {}).name || '?';
-  box.append(h('div', { class: 'row' }, h('button', { on: { click: () => { showLib(); refresh(); } } }, '← Back'),
-    h('span', { class: 'mono', style: 'color:var(--mut)' }, g.path)));
+  const players = sortedPlayers(d.players);
+  const byPid = new Map(d.players.map(p => [p.pid, p]));
+  const nameSpan = p => h('span', { style: 'font-weight:700;color:' + plColor(p) }, p.name);
+  box.append(h('div', { class: 'row backbar' }, h('button', { class: 'pri', on: { click: () => { showLib(); refresh(); } } }, '← Back')));
   box.append(h('h2', {}, g.map + ' · ' + g.mode + ' · ' + fmt(g.duration_s)));
-  box.append(h('div', { class: 'sub', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at) + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : '')));
+  box.append(h('div', { class: 'row', style: 'gap:10px;margin:6px 0 12px' }, fileChip(g.path),
+    h('span', { class: 'sub', style: 'margin:0', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at) + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : ''))));
 
-  const pt = h('table', {}, h('tr', {}, ...['', 'Player', 'Team', 'Race', 'Result', 'MMR', 'APM', 'Build'].map(x => h('th', {}, x))));
-  for (const p of d.players) {
-    const b = d.tags.find(t => t.pid === p.pid && t.family === 'build');
-    const bl = d.tags.filter(t => t.pid === p.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => t.label).join(', ');
-    pt.append(h('tr', {}, h('td', {}, h('span', { class: 'race ' + (RACE[p.race] || '') }, RACE[p.race] || '?')),
-      h('td', { style: 'font-weight:600;color:' + plColor(p) }, p.name + (p.clan ? ' [' + p.clan + ']' : '')), h('td', {}, 'T' + p.team), h('td', {}, p.race),
-      h('td', { class: p.result === 'Win' ? '' : '', style: 'color:' + (p.result === 'Win' ? 'var(--win)' : 'var(--loss)') }, p.result),
-      h('td', {}, p.mmr || '–'), h('td', {}, p.apm_blizzard ? Math.round(p.apm_blizzard) : '~' + Math.round(p.apm_est)),
-      h('td', { title: b ? b.evidence : '' }, bl || (b ? 'unnamed' : '–'))));
+  // players: the same layout as the library cards, plus the rating
+  const byTeam = new Map();
+  for (const pl of players) (byTeam.get(pl.team) || byTeam.set(pl.team, []).get(pl.team)).push(pl);
+  const teamNums = [...byTeam.keys()];
+  const buildTags = pl => d.tags.filter(t => t.pid === pl.pid && t.family === 'build' && t.tag !== 'build:unnamed');
+  box.append(h('div', { class: 'panel' }, h('div', { class: 'teams', style: 'margin:0;grid-template-columns:repeat(' + Math.max(1, teamNums.length) + ',minmax(0,1fr))' },
+    ...teamNums.map(tn => {
+      const ps = byTeam.get(tn), res = ps[0].result === 'Win' ? 'won' : ps[0].result === 'Loss' ? 'lost' : '';
+      return h('div', { class: 'team' }, h('div', { class: 'th' }, 'Team ' + tn, res ? h('span', { class: 'res ' + res }, res) : null),
+        ...ps.map(pl => h('div', { class: 'pl' },
+          h('span', { class: 'race ' + (RACE[pl.race] || '') }, RACE[pl.race] || '?'), nameSpan(pl),
+          pl.clan ? h('small', { style: 'color:var(--mut)' }, '[' + pl.clan + ']') : null,
+          pl.mmr ? h('small', { style: 'color:var(--mut)', title: 'Matchmaking rating' }, 'MMR ' + pl.mmr) : null,
+          ...buildTags(pl).map(t => tagPill(t, { cls: 'sm', goBack: true })))));
+    }))));
+
+  // highlights: one row per tag, with a short description
+  const order = ['shape', 'spectacle', 'social'];
+  const hl = d.tags.filter(t => order.includes(t.family)).sort((x, y) => order.indexOf(x.family) - order.indexOf(y.family));
+  if (hl.length) {
+    const tb = h('table', { class: 'plain hi' });
+    for (const t of hl) {
+      const who = t.pid != null ? byPid.get(t.pid) : null;
+      const quoted = d.chat.some(c => c.text === t.evidence);   // a chat word tag keeps the message as its evidence
+      tb.append(h('tr', {}, h('td', {}, tagPill(t, { goBack: true })),
+        h('td', {}, who ? nameSpan(who) : null, who ? ': ' : null, quoted ? '“' + t.evidence + '”' : (t.evidence || describe(t.tag, t.label)))));
+    }
+    box.append(h('div', { class: 'panel' }, h('h3', {}, 'Highlights'), tb));
   }
-  box.append(h('div', { class: 'panel' }, pt));
 
-  // tags on this game
-  const gtags = d.tags.filter(t => ['shape', 'spectacle', 'social'].includes(t.family));
-  if (gtags.length) box.append(h('div', { class: 'panel' }, h('h3', {}, 'What stands out'),
-    h('div', { class: 'chips' }, ...gtags.map(t => h('span', { class: 'chip flat', title: t.evidence }, (t.pid != null ? nameOf(t.pid) + ': ' : '') + t.label + (t.evidence ? ' · ' + t.evidence : ''))))));
-
-  const tlPanel = h('div', { class: 'panel' }, h('h3', {}, 'Timeline'),
-    h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:var(--acc)' }), 'APM (30 s)'), h('span', {}, h('i', { style: 'background:var(--sup)' }), 'Supply'),
-      h('span', {}, h('i', { style: 'background:var(--fgt)' }), 'Value killed + lost'), h('span', {}, h('i', { style: 'background:var(--ob)' }), 'Your marks'),
+  box.append(h('div', { class: 'panel' }, h('h3', {}, 'Timeline'),
+    h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:var(--acc)' }), 'APM (per 30 s)'), h('span', {}, h('i', { style: 'background:var(--sup)' }), 'Supply'),
+      h('span', {}, h('i', { style: 'background:var(--fgt)' }), 'Losses'), h('span', {}, h('i', { style: 'background:var(--ob)' }), 'Your marks'),
       h('span', {}, 'Drag on the top ruler to add a mark')),
     h('div', { id: 'markform', hidden: true, class: 'row', style: 'margin-bottom:8px' }),
-    h('div', { id: 'tl' }));
-  box.append(tlPanel);
+    h('div', { id: 'tl' })));
 
   const two = h('div', { class: 'two' });
-  // skills
+  // skills, grouped by race: a click shows the skill as a row of pips at the bottom of the timeline
   const sk = h('div', { class: 'panel' }, h('h3', {}, 'Skills (click to show on the timeline)'));
-  for (const p of d.players) {
+  for (const race of ['Terran', 'Protoss', 'Zerg']) {
+    const pids = new Set(players.filter(pl => pl.race === race).map(pl => pl.pid));
+    if (!pids.size) continue;
     const by = new Map();
-    for (const c of d.casts) if (c.pid === p.pid) { const e = by.get(c.ability) || { n: 0, first: c.t, grp: c.grp }; e.n++; by.set(c.ability, e); }
+    for (const c of d.casts) if (pids.has(c.pid)) { const e = by.get(c.ability) || { n: 0, first: c.t }; e.n++; by.set(c.ability, e); }
     if (!by.size) continue;
-    sk.append(h('div', { style: 'margin:6px 0 2px;font-weight:600' }, p.name));
-    sk.append(h('div', { class: 'chips' }, ...[...by.entries()].sort((a, b) => b[1].n - a[1].n).map(([ab, e]) => {
-      const tag = 'skill:' + ab, on = d.pick.has(tag) || S.tags.some(f => f.tag === tag);
-      return h('span', { class: 'chip' + (on ? ' on' : ''), title: 'first at ' + fmt(e.first) + (e.grp ? ' · group ' + e.grp : ''), on: { click: () => {
-        if (d.pick.has(tag)) d.pick.delete(tag); else d.pick.set(tag, true); renderGame(); } } }, ab, h('small', {}, 'x' + e.n));
+    sk.append(h('div', { style: 'margin:8px 0 3px;font-weight:600;display:flex;gap:6px;align-items:center' }, h('span', { class: 'race ' + RACE[race] }, RACE[race]), race));
+    sk.append(h('div', { class: 'chips' }, ...[...by.entries()].sort((x, y) => y[1].n - x[1].n).map(([ab, e]) => {
+      const tag = 'skill:' + ab;
+      return h('span', { class: 'chip' + (d.pick.has(tag) ? ' on' : ''), title: describe(tag, ab) + ' (first at ' + fmt(e.first) + ')',
+        on: { click: () => { if (d.pick.has(tag)) d.pick.delete(tag); else d.pick.set(tag, true); renderGame(); } } }, ab, h('small', {}, 'x' + e.n));
     })));
   }
   two.append(sk);
@@ -915,27 +947,39 @@ function renderGame() {
   two.append(ft);
   box.append(two);
 
-  // build orders
+  // build orders: one column per player, rows are seconds, so what happened at the same moment lines up
   const hitSet = matchedSteps(d);
-  const bo = h('div', { class: 'panel' }, h('h3', {}, 'Build orders'));
-  const tw = h('div', { class: 'two' });
-  for (const p of d.players) {
-    const col = h('div', {}, h('div', { style: 'font-weight:600;color:' + plColor(p) }, p.name + ' (' + p.race + ')'));
-    const tm = d.timings.filter(t => t.pid === p.pid);
-    if (tm.length) col.append(h('div', { class: 'chips', style: 'margin:4px 0' }, ...tm.map(t => h('span', { class: 'chip flat' }, (THING_LABEL[t.key] || t.key) + ' ' + fmt(t.t)))));
-    const ln = h('div', { class: 'steps' });
-    for (const s of d.steps.filter(s => s.pid === p.pid && s.t <= 600)) {
-      ln.append(h('div', { class: hitSet.has(p.pid + ':' + s.idx) ? 'hit' : '' }, fmt(s.t).padStart(5) + '  ' + String(s.supply).padStart(3) + '  ' + s.name + (s.nth > 1 && s.kind === 'struct' ? ' #' + s.nth : '') + (s.kind === 'research' || s.kind === 'morph' ? ' (' + s.kind + ')' : '')));
-    }
-    col.append(ln); tw.append(col);
+  const bySec = new Map();
+  for (const s of d.steps) {
+    if (s.t > 600) continue;
+    const sec = Math.round(s.t);
+    if (!bySec.has(sec)) bySec.set(sec, new Map());
+    const cell = bySec.get(sec);
+    if (!cell.has(s.pid)) cell.set(s.pid, []);
+    cell.get(s.pid).push(s);
   }
-  bo.append(h('div', { style: 'color:var(--mut);font-size:12px;margin-bottom:4px' }, 'Time, supply (approximate, ±2–3), step. First 10 minutes.'), tw);
-  box.append(bo);
+  const sep = (pl, i) => (i && pl.team !== players[i - 1].team ? ' sep' : '');
+  const bt = h('table', { class: 'plain bo' },
+    h('tr', {}, h('th', { class: 't' }), ...players.map((pl, i) => h('th', { class: sep(pl, i).trim() },
+      h('span', { class: 'race ' + (RACE[pl.race] || ''), style: 'margin-right:5px' }, RACE[pl.race] || '?'), nameSpan(pl)))),
+    h('tr', { class: 'kt' }, h('td', { class: 't' }, 'key'), ...players.map((pl, i) => h('td', { class: sep(pl, i).trim() },
+      h('div', { class: 'chips' }, ...d.timings.filter(t => t.pid === pl.pid).map(t => h('span', { class: 'chip flat sm' }, (THING_LABEL[t.key] || t.key) + ' ' + fmt(t.t))))))));
+  for (const sec of [...bySec.keys()].sort((x, y) => x - y)) {
+    bt.append(h('tr', {}, h('td', { class: 't' }, fmt(sec)), ...players.map((pl, i) => {
+      const list = bySec.get(sec).get(pl.pid) || [];
+      return h('td', { class: (list.some(s => hitSet.has(pl.pid + ':' + s.idx)) ? 'hit' : '') + sep(pl, i) },
+        ...list.map(s => h('div', {}, h('span', { class: 'sup' }, String(s.supply)), s.name + (s.kind === 'research' || s.kind === 'morph' ? ' (' + s.kind + ')' : ''))));
+    })));
+  }
+  box.append(h('div', { class: 'panel' }, h('h3', {}, 'Build orders'),
+    h('div', { style: 'color:var(--mut);font-size:12px;margin-bottom:6px' }, 'Time, then supply (approximate, ±2–3) and step. First 10 minutes.'), bt));
 
   // chat
   if (d.chat.length) {
-    box.append(h('div', { class: 'panel' }, h('h3', {}, 'Chat'),
-      h('table', {}, ...d.chat.map(c => h('tr', {}, h('td', { class: 'mono' }, fmt(c.t)), h('td', {}, c.pid != null ? nameOf(c.pid) : '–'), h('td', {}, (c.to_all ? '' : '[allies] ') + c.text))))));
+    box.append(h('div', { class: 'panel' }, h('h3', {}, 'Chat'), h('table', { class: 'plain chat' }, ...d.chat.map(c => {
+      const pl = byPid.get(c.pid);
+      return h('tr', {}, h('td', { class: 'mono t', style: 'color:var(--mut)' }, fmt(c.t)), h('td', { class: 'who' }, pl ? nameSpan(pl) : '–'), h('td', {}, (c.to_all ? '' : '[allies] ') + c.text));
+    }))));
   }
 
   // notes
@@ -974,36 +1018,39 @@ function matchedSteps(d) {
 /* -------------------------------------------------------------- timeline svg */
 function drawTimeline(d, note) {
   const el = $('#tl'); el.replaceChildren();
-  const dur = d.g.duration_s, labW = 120, W = Math.max(640, el.clientWidth), plotW = W - labW - 12;
+  const dur = d.g.duration_s, labW = 150, W = Math.max(640, el.clientWidth), plotW = W - labW - 12;
   const X = t => labW + t / dur * plotW;
   const laneH = 30, gap = 4;
-  const maxApm = Math.max(1, ...d.apm.map(a => a.n));
+  const players = sortedPlayers(d.players), byPid = new Map(d.players.map(p => [p.pid, p]));
+  const apmOf = new Map();
+  for (const a of d.apm) { if (!apmOf.has(a.pid)) apmOf.set(a.pid, new Map()); apmOf.get(a.pid).set(a.bucket, a.n); }
+  const maxApm = Math.max(1, ...d.apm.map(a => a.n)), nb = Math.max(1, Math.ceil(dur / 30));
   const deltas = new Map();
-  for (const p of d.players) {
+  for (const p of players) {
     const st = d.stats.filter(s => s.pid === p.pid), out = [];
     st.forEach((s, i) => { const prev = st[i - 1]; out.push({ t: s.t, v: prev ? Math.max(0, (s.killed - prev.killed) + (s.lost - prev.lost)) : 0, w: prev ? s.t - prev.t : 0 }); });
     deltas.set(p.pid, out);
   }
   const maxFgt = Math.max(1, ...[...deltas.values()].flat().map(x => x.v));
-  const ann = activeTagList(d);
+  const ann = activeTagList(d).filter(t => !t.startsWith('skill:'));          // other filters: a thin lane under each player
+  const skills = [...d.pick.keys()].map(t => t.slice(6)).filter(n => d.casts.some(c => c.ability === n));  // skills: pip rows at the bottom
   let y = 22, svg = '', bands = '';
   const lbl = (yy, text) => `<text x="${labW - 6}" y="${yy + laneH - 4}" font-size="10" text-anchor="end" fill="var(--mut)">${text}</text>`;
-  const lanes = [];
-  // ruler
   const step = dur > 1500 ? 300 : dur > 600 ? 120 : 60;
   let ruler = `<rect x="${labW}" y="0" width="${plotW}" height="18" fill="var(--bar)" id="ruler"/>`;
   for (let t = 0; t <= dur; t += step) ruler += `<text x="${X(t) + 3}" y="13" font-size="11" fill="var(--mut)">${fmt(t)}</text><line x1="${X(t)}" x2="${X(t)}" y1="0" y2="@H@" stroke="var(--line)" stroke-width="1"/>`;
-  for (const p of d.players) {
-    svg += `<text x="4" y="${y + 12}" font-size="12" font-weight="600" fill="${plColor(p)}">${esc(p.name.slice(0, 14))}</text><text x="4" y="${y + 26}" font-size="11" fill="var(--mut)">${esc(p.race)} · T${p.team} · ${esc(p.result)}</text>`;
-    const top = y;
-    // apm lane
-    for (const a of d.apm.filter(a => a.pid === p.pid)) {
-      const bh = a.n / maxApm * laneH, x0 = X(a.bucket * 30), w = Math.max(1, X(30) - X(0) - 1);
-      svg += `<rect x="${x0}" y="${y + laneH - bh}" width="${w}" height="${bh}" fill="var(--acc)" opacity=".75"/>`;
+  for (const p of players) {
+    svg += `<text x="4" y="${y + 12}" font-size="12" font-weight="600" fill="${plColor(p)}">${esc(p.name.slice(0, 16))}</text><text x="4" y="${y + 26}" font-size="11" fill="var(--mut)">${esc(p.race)} · T${p.team} · ${esc(p.result)}</text>`;
+    // APM: one point per 30 s, joined by straight lines. A bucket with no actions is a real 0, not skipped.
+    const mine = apmOf.get(p.pid) || new Map(), pts = [];
+    for (let b = 0; b < nb; b++) {
+      const n = mine.get(b) || 0;
+      pts.push([X(Math.min(dur, b * 30 + 15)), y + laneH - 2 - (n / maxApm) * (laneH - 4), n, b]);
     }
+    svg += `<polyline points="${pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="var(--acc)" stroke-width="1.5" stroke-linejoin="round"/>`;
+    for (const q of pts) svg += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="2.2" fill="var(--acc)"><title>${q[2] * 2} actions per minute at ${fmt(q[3] * 30)}</title></circle>`;
+    svg += lbl(y, 'APM');
     y += laneH + gap;
-    svg += lbl(y - laneH - gap, 'APM');
-    // supply lane
     const st = d.stats.filter(s => s.pid === p.pid);
     if (st.length) {
       let path = `M${X(st[0].t)},${y + laneH}`;
@@ -1013,15 +1060,13 @@ function drawTimeline(d, note) {
     }
     svg += lbl(y, 'supply');
     y += laneH + gap;
-    // fight intensity lane
     for (const f of deltas.get(p.pid)) {
       if (!f.v) continue;
       const bh = f.v / maxFgt * laneH;
       svg += `<rect x="${X(f.t - f.w)}" y="${y + laneH - bh}" width="${Math.max(1, X(f.w) - X(0))}" height="${bh}" fill="var(--fgt)" opacity=".8"/>`;
     }
-    svg += lbl(y, 'fights');
+    svg += lbl(y, 'losses');
     y += laneH + gap;
-    // annotation lane
     if (ann.length) {
       svg += `<text x="${labW - 6}" y="${y + 11}" font-size="10" text-anchor="end" fill="var(--mut)">filters</text>`;
       ann.forEach((tag, i) => {
@@ -1034,31 +1079,58 @@ function drawTimeline(d, note) {
     }
     svg += `<line x1="0" x2="${W}" y1="${y - gap / 2 + 2}" y2="${y - gap / 2 + 2}" stroke="var(--line)"/>`;
     y += 8;
-    lanes.push([top, y]);
+  }
+  // skills: one row per skill, one pip per use, coloured by player
+  if (skills.length) {
+    svg += `<text x="4" y="${y + 10}" font-size="12" font-weight="600" fill="var(--fg)">Skills</text>`;
+    for (const ab of skills) {
+      const cy = y + 9;
+      const short = ab.length > 22 ? ab.slice(0, 21) + '…' : ab;
+      svg += `<text x="${labW - 6}" y="${cy + 4}" font-size="11" text-anchor="end" fill="var(--fg)"><title>${esc(ab)}</title>${esc(short)}</text>`;
+      svg += `<line x1="${labW}" x2="${labW + plotW}" y1="${cy}" y2="${cy}" stroke="var(--line)" stroke-dasharray="2 3"/>`;
+      for (const c of d.casts.filter(c => c.ability === ab)) {
+        const pl = byPid.get(c.pid);
+        if (!pl) continue;
+        svg += `<circle class="pip" data-pid="${c.pid}" data-skill="${esc(ab)}" data-name="${esc(pl.name)}" data-t="${c.t}" cx="${X(c.t).toFixed(1)}" cy="${cy}" r="4.5" fill="${plColor(pl)}" stroke="var(--panel)" stroke-width="1.2"/>`;
+      }
+      y += 18;
+    }
+    y += 6;
   }
   const H = y + 4;
   for (const f of d.fights) bands += `<rect x="${X(f.t0)}" y="18" width="${Math.max(2, X(f.t1) - X(f.t0))}" height="${H - 18}" fill="var(--fgt)" opacity=".12"><title>fight ${fmt(f.t0)}–${fmt(f.t1)}</title></rect>`;
   for (const m of note.marks || []) bands += `<rect x="${X(m.t0)}" y="0" width="${Math.max(2, X(m.t1) - X(m.t0))}" height="${H}" fill="var(--ob)" opacity=".22"><title>${esc(m.text || 'mark')} ${fmt(m.t0)}–${fmt(m.t1)}</title></rect>`;
-  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="18" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" /><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0"/></svg>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="18" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" pointer-events="none"/><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0" pointer-events="none"/></svg>`;
   if (ann.length) {
-    const lg = h('div', { class: 'legend', style: 'margin-top:6px' }, ...ann.map((t, i) => h('span', {}, h('i', { style: 'background:' + COLORS[i % COLORS.length] }), t)));
-    el.append(lg);
+    el.append(h('div', { class: 'legend', style: 'margin-top:6px' }, ...ann.map((t, i) => h('span', {}, h('i', { style: 'background:' + COLORS[i % COLORS.length] }), t))));
   }
   const svgEl = el.querySelector('svg'), tip = h('div', { id: 'tip', hidden: true });
   el.append(tip);
+  // hovering a pip dims every other player's pips, in all skill rows
+  const pips = [...svgEl.querySelectorAll('.pip')];
+  for (const c of pips) {
+    c.addEventListener('mouseenter', () => { for (const o of pips) o.style.opacity = o.dataset.pid === c.dataset.pid ? '1' : '0.12'; });
+    c.addEventListener('mouseleave', () => { for (const o of pips) o.style.opacity = ''; });
+  }
   const tAt = ev => { const r = svgEl.getBoundingClientRect(); return Math.min(dur, Math.max(0, (ev.clientX - r.left - labW) / plotW * dur)); };
   let dragFrom = null;
   svgEl.addEventListener('mousemove', ev => {
     const t = tAt(ev), r = svgEl.getBoundingClientRect(), px = ev.clientX - r.left;
     const cur = svgEl.querySelector('#cur'); cur.setAttribute('x1', px); cur.setAttribute('x2', px); cur.setAttribute('opacity', px > labW ? .5 : 0);
     if (dragFrom !== null) { const a = Math.min(dragFrom, t), b = Math.max(dragFrom, t); const dr = svgEl.querySelector('#drag'); dr.setAttribute('x', X(a)); dr.setAttribute('width', X(b) - X(a)); }
-    const lines = [fmt(t)];
-    for (const p of d.players) {
-      const st = d.stats.filter(s => s.pid === p.pid); let near = null;
-      for (const s of st) if (s.t <= t) near = s;
-      if (near) lines.push(p.name.slice(0, 12).padEnd(12) + ' sup ' + String(near.food_used).padStart(3) + '/' + near.food_made + '  wk ' + near.workers + '  bank ' + (near.min_bank + near.gas_bank) + '  army ' + near.army_value);
+    const pip = ev.target.closest ? ev.target.closest('.pip') : null;
+    if (pip) {
+      tip.textContent = pip.dataset.skill + '\n' + pip.dataset.name + ' · ' + fmt(+pip.dataset.t);
+    } else {
+      const lines = [fmt(t)];
+      for (const p of players) {
+        let near = null;
+        for (const s of d.stats) if (s.pid === p.pid && s.t <= t) near = s;
+        if (near) lines.push(p.name.slice(0, 12).padEnd(12) + ' sup ' + String(near.food_used).padStart(3) + '/' + near.food_made + '  wk ' + near.workers + '  bank ' + (near.min_bank + near.gas_bank) + '  army ' + near.army_value);
+      }
+      tip.textContent = lines.join('\n');
     }
-    tip.textContent = lines.join('\n'); tip.hidden = false;
+    tip.hidden = false;
     tip.style.left = Math.min(px + 14, W - 380) + 'px'; tip.style.top = '24px';
   });
   svgEl.addEventListener('mouseleave', () => { tip.hidden = true; svgEl.querySelector('#cur').setAttribute('opacity', 0); });
