@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 7  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 8  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -448,8 +448,12 @@ def parse_replay(path):
         ranked = sorted(team_loss.items(), key=lambda kv: kv[1])
         lo, hi = ranked[0], ranked[-1]
         if hi[1] >= CFG['stomp_min_loss'] and hi[1] >= CFG['stomp_ratio'] * max(lo[1], 1):
-            tg.add(None, 'shape', 'stomp', 'inferred', 'stomp',
-                   'Team %d lost %s, team %d lost %s' % (hi[0], format(hi[1], ','), lo[0], format(lo[1], ',')))
+            # The team that lost less is the one that destroyed more: its kills are the other team's losses.
+            if lo[1] == 0:
+                why = 'Team %d destroyed %s value, team %d destroyed none' % (lo[0], format(hi[1], ','), hi[0])
+            else:
+                why = 'Team %d destroyed %dx more value than team %d' % (lo[0], round(hi[1] / lo[1]), hi[0])
+            tg.add(None, 'shape', 'stomp', 'inferred', 'stomp', why)
     fvals = []
     for i, f in enumerate(fights):
         fvals.append((i, sum(d['value'] for d in f)))

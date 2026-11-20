@@ -234,3 +234,20 @@ Open points:
 - Times appear only in the left column. A player's cell holds the supply and the step. The subtitle reads "first 10 minutes only".
 - The "key" row of timing chips is gone. A key timing is now a small label on the step that happened at that moment (natural, third base, first gas, first production, first tech, first army). Every timing except `max_supply` has a build step at exactly the same time and of the matching kind (checked on all 6 replays: 0 misses), so the match is exact. `max_supply` has no step, so it gets its own line, "Reached 200 supply", in that player's column (only if it happens within 10 minutes). All 24 labels in one game landed on the right step and column.
 - Parser bug found by this: an Overlord counted as "army", so a Zerg player's first army unit was an Overlord at about 0:30 and `unit:Overlord` was a tag. Fixed with `NOT_ARMY`. The check must use the type at birth (`e.unit_type_name`). sc2reader's `u.name` is the unit's LAST type, so an overlord that later became an overseer reports `Overseer` and slipped through the first version of the fix. Parser version is now 7. The "first army unit" histogram and filter are now correct for Zerg.
+
+## UI feedback round 4 (2026-11-21)
+
+Timeline:
+- The ruler is 36 px tall (was 18). `RH` in `drawTimeline()` holds the height, and the lanes, the fight bands and the crosshair all derive from it.
+- A mark can start anywhere in the plot area, not only on the ruler. A drag shorter than 2 s is ignored, so a plain click opens nothing. Checked: a click does nothing, a drag across the middle of a lane opens the form and saves the mark.
+- The "Skills" heading overlapped the first skill name, because the first row started at the heading's own height. The heading now gets its own 22 px line (measured: heading bottom 493, label top 505).
+
+Library:
+- The matchup hover uses `opacity` only. Before, the hover rules overrode the background, so hovering a selected button turned it back to its dim tint. Checked: a selected button keeps its solid colour at opacity 0.78 on hover.
+- Units are listed fewest games first. Other categories still list the most games first.
+- All tag categories start collapsed.
+- The `+` and `−` on a pill are drawn with two gradient bars, not typed as text, so font metrics cannot push them off centre. Measured on a 4x screenshot: the cross is 9 x 9 px and within 0.4 px of the chip's vertical centre.
+
+Game page:
+- The stomp text now says who destroyed more: "Team 1 destroyed 4x more value than team 2". The team that lost less destroyed more, because its kills are the other team's losses. With a zero loss it reads "Team 1 destroyed 25,300 value, team 2 destroyed none". Parser version is now 8.
+- The heading moved into the sticky bar (`.gamebar`). Row one is the back button, row two is the heading with the file chip and date on the right. The bar has a bottom line, since it is taller now. Checked: heading above-left, meta at the right edge on the same row, both still visible after scrolling 2500 px.

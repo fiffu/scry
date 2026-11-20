@@ -43,8 +43,9 @@ aside details.sec>summary{margin:14px 0 6px;font-size:12px;font-weight:700;lette
 .chip:not(.flat):hover{border-color:var(--acc)}
 .fc small{position:relative;display:inline-block;min-width:.8em;text-align:center}
 .fc:hover small{color:transparent}
-.fc:hover small::after{content:'+';position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:700;color:var(--acc)}
-.fc.on:hover small::after{content:'\2212'}
+/* The + and the minus are drawn as bars, so font metrics cannot push them off centre. */
+.fc:hover small::after{content:'';position:absolute;inset:0;background:linear-gradient(var(--acc),var(--acc)) center/9px 2px no-repeat,linear-gradient(var(--acc),var(--acc)) center/2px 9px no-repeat}
+.fc.on:hover small::after{background:linear-gradient(var(--acc),var(--acc)) center/9px 2px no-repeat}
 #sugg{position:absolute;z-index:20;left:0;right:0;top:100%;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004;max-height:300px;overflow:auto}
 #sugg button{display:flex;width:100%;justify-content:space-between;border:0;border-radius:0;text-align:left}
 #sugg button.sel{background:var(--accbg)}
@@ -89,7 +90,10 @@ summary small{color:var(--mut);font-weight:400}
 .empty{color:var(--mut);padding:24px;text-align:center}
 #game{flex:1;min-height:0;overflow-y:auto;padding:14px 18px 40px}
 #game h2{margin:0 0 4px}
-.backbar{position:sticky;top:-14px;z-index:20;background:var(--bg);margin:-14px -18px 14px;padding:10px 18px}
+.gamebar{position:sticky;top:-14px;z-index:20;background:var(--bg);margin:-14px -18px 14px;padding:10px 18px;border-bottom:1px solid var(--line)}
+.gamebar .hd{display:flex;gap:6px 16px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:10px}
+.gamebar h2{margin:0}
+.gamebar .meta{display:flex;gap:10px;align-items:center}
 .sub{color:var(--mut);margin-bottom:12px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
 .panel h3{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
@@ -130,9 +134,7 @@ table.plain td,table.plain th{border-bottom:0}
 .mu button.P{background:color-mix(in srgb,#b08d1f 16%,var(--panel));border-color:color-mix(in srgb,#b08d1f 38%,var(--line))}
 .mu button.T{background:color-mix(in srgb,#3f7cc0 16%,var(--panel));border-color:color-mix(in srgb,#3f7cc0 38%,var(--line))}
 .mu button.Z{background:color-mix(in srgb,#9a46b8 16%,var(--panel));border-color:color-mix(in srgb,#9a46b8 38%,var(--line))}
-.mu button.P:hover{background:color-mix(in srgb,#b08d1f 30%,var(--panel))}
-.mu button.T:hover{background:color-mix(in srgb,#3f7cc0 30%,var(--panel))}
-.mu button.Z:hover{background:color-mix(in srgb,#9a46b8 30%,var(--panel))}
+.mu button:hover{opacity:.78}
 #lib.welcome{grid-template-columns:1fr}#lib.welcome aside{display:none}
 @media (max-width:900px){#lib{grid-template-columns:1fr;grid-auto-rows:auto;overflow-y:auto}aside{border-right:0;border-bottom:1px solid var(--line);max-height:60vh}}
 </style></head><body>
@@ -567,7 +569,7 @@ $('#scope').onchange = e => { S.scope = e.target.checked; refresh(); };
 const FAMS = [['build', 'Builds', ['build']], ['unit', 'Units', ['unit']], ['upgrade', 'Upgrades', ['upgrade']],
   ['skill', 'Skills', ['skill']], ['highlights', 'Game highlights', ['shape', 'spectacle']],
   ['econ', 'Economy', ['econ']], ['social', 'Social', ['social']], ['mine', 'Mine', ['mine']]];
-const openFams = new Set(['build', 'highlights']);
+const openFams = new Set();   // every category starts collapsed
 const famAll = new Set();
 function tagState(tag) { return S.tags.find(f => f.tag === tag); }
 function renderFacets() {
@@ -585,7 +587,7 @@ function renderFacets() {
   for (const r of (by.map || []).slice().sort((x, y) => x.label.localeCompare(y.label))) maps.append(chipFor(r));
   if (!maps.childElementCount) maps.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'no maps'));
   for (const [fam, title, srcs] of FAMS) {
-    const list = srcs.flatMap(f => by[f] || []).sort((x, y) => y.c - x.c || x.label.localeCompare(y.label));
+    const list = srcs.flatMap(f => by[f] || []).sort((x, y) => (fam === 'unit' ? x.c - y.c : y.c - x.c) || x.label.localeCompare(y.label));   // units: fewest games first
     const d = h('details', { open: openFams.has(fam) });
     d.addEventListener('toggle', () => { d.open ? openFams.add(fam) : openFams.delete(fam); });
     d.append(h('summary', {}, title + ' ', h('small', {}, '(' + list.length + ')')));
@@ -874,10 +876,12 @@ function renderGame() {
   const players = sortedPlayers(d.players);
   const byPid = new Map(d.players.map(p => [p.pid, p]));
   const nameSpan = p => h('span', { style: 'font-weight:700;color:' + plColor(p) }, p.name);
-  box.append(h('div', { class: 'row backbar' }, h('button', { class: 'pri', on: { click: () => { showLib(); refresh(); } } }, '← Back')));
-  box.append(h('h2', {}, g.map + ' · ' + g.mode + ' · ' + fmt(g.duration_s)));
-  box.append(h('div', { class: 'row', style: 'gap:10px;margin:6px 0 12px' }, fileChip(g.path),
-    h('span', { class: 'sub', style: 'margin:0', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at) + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : ''))));
+  // The back button and the heading stay at the top while the page scrolls.
+  box.append(h('div', { class: 'gamebar' },
+    h('div', { class: 'row' }, h('button', { class: 'pri', on: { click: () => { showLib(); refresh(); } } }, '← Back')),
+    h('div', { class: 'hd' }, h('h2', {}, g.map + ' · ' + g.mode + ' · ' + fmt(g.duration_s)),
+      h('div', { class: 'meta' }, fileChip(g.path),
+        h('span', { class: 'sub', style: 'margin:0', title: new Date(g.played_at).toLocaleString() }, fmtDate(g.played_at) + ' · build ' + g.build + (g.category ? ' · ' + g.category : '') + (g.winner_team ? ' · team ' + g.winner_team + ' won' : ''))))));
 
   // players: the same layout as the library cards, plus the rating
   const byTeam = new Map();
@@ -912,7 +916,7 @@ function renderGame() {
   box.append(h('div', { class: 'panel' }, h('h3', {}, 'Timeline'),
     h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:var(--acc)' }), 'APM (per 30 s)'), h('span', {}, h('i', { style: 'background:var(--sup)' }), 'Supply'),
       h('span', {}, h('i', { style: 'background:var(--fgt)' }), 'Losses'), h('span', {}, h('i', { style: 'background:var(--ob)' }), 'Your marks'),
-      h('span', {}, 'Drag on the top ruler to add a mark')),
+      h('span', {}, 'Drag anywhere on the timeline to add a mark')),
     h('div', { id: 'markform', hidden: true, class: 'row', style: 'margin-bottom:8px' }),
     h('div', { id: 'tl' })));
 
@@ -1031,7 +1035,7 @@ function drawTimeline(d, note) {
   const el = $('#tl'); el.replaceChildren();
   const dur = d.g.duration_s, labW = 150, W = Math.max(640, el.clientWidth), plotW = W - labW - 12;
   const X = t => labW + t / dur * plotW;
-  const laneH = 30, gap = 4;
+  const laneH = 30, gap = 4, RH = 36;   // RH: ruler height
   const players = sortedPlayers(d.players), byPid = new Map(d.players.map(p => [p.pid, p]));
   const apmOf = new Map();
   for (const a of d.apm) { if (!apmOf.has(a.pid)) apmOf.set(a.pid, new Map()); apmOf.get(a.pid).set(a.bucket, a.n); }
@@ -1045,11 +1049,11 @@ function drawTimeline(d, note) {
   const maxFgt = Math.max(1, ...[...deltas.values()].flat().map(x => x.v));
   const ann = activeTagList(d).filter(t => !t.startsWith('skill:'));          // other filters: a thin lane under each player
   const skills = [...d.pick.keys()].map(t => t.slice(6)).filter(n => d.casts.some(c => c.ability === n));  // skills: pip rows at the bottom
-  let y = 22, svg = '', bands = '';
+  let y = RH + 4, svg = '', bands = '';
   const lbl = (yy, text) => `<text x="${labW - 6}" y="${yy + laneH - 4}" font-size="10" text-anchor="end" fill="var(--mut)">${text}</text>`;
   const step = dur > 1500 ? 300 : dur > 600 ? 120 : 60;
-  let ruler = `<rect x="${labW}" y="0" width="${plotW}" height="18" fill="var(--bar)" id="ruler"/>`;
-  for (let t = 0; t <= dur; t += step) ruler += `<text x="${X(t) + 3}" y="13" font-size="11" fill="var(--mut)">${fmt(t)}</text><line x1="${X(t)}" x2="${X(t)}" y1="0" y2="@H@" stroke="var(--line)" stroke-width="1"/>`;
+  let ruler = `<rect x="${labW}" y="0" width="${plotW}" height="${RH}" fill="var(--bar)" id="ruler"/>`;
+  for (let t = 0; t <= dur; t += step) ruler += `<text x="${X(t) + 4}" y="${RH / 2 + 4}" font-size="12" fill="var(--mut)">${fmt(t)}</text><line x1="${X(t)}" x2="${X(t)}" y1="0" y2="@H@" stroke="var(--line)" stroke-width="1"/>`;
   for (const p of players) {
     svg += `<text x="4" y="${y + 12}" font-size="12" font-weight="600" fill="${plColor(p)}">${esc(p.name.slice(0, 16))}</text><text x="4" y="${y + 26}" font-size="11" fill="var(--mut)">${esc(p.race)} · T${p.team} · ${esc(p.result)}</text>`;
     // APM: one point per 30 s, joined by straight lines. A bucket with no actions is a real 0, not skipped.
@@ -1094,6 +1098,7 @@ function drawTimeline(d, note) {
   // skills: one row per skill, one pip per use, coloured by player
   if (skills.length) {
     svg += `<text x="4" y="${y + 10}" font-size="12" font-weight="600" fill="var(--fg)">Skills</text>`;
+    y += 22;   // the heading gets its own line, so a long skill name cannot run into it
     for (const ab of skills) {
       const cy = y + 9;
       const short = ab.length > 22 ? ab.slice(0, 21) + '…' : ab;
@@ -1109,9 +1114,9 @@ function drawTimeline(d, note) {
     y += 6;
   }
   const H = y + 4;
-  for (const f of d.fights) bands += `<rect x="${X(f.t0)}" y="18" width="${Math.max(2, X(f.t1) - X(f.t0))}" height="${H - 18}" fill="var(--fgt)" opacity=".12"><title>fight ${fmt(f.t0)}–${fmt(f.t1)}</title></rect>`;
+  for (const f of d.fights) bands += `<rect x="${X(f.t0)}" y="${RH}" width="${Math.max(2, X(f.t1) - X(f.t0))}" height="${H - RH}" fill="var(--fgt)" opacity=".12"><title>fight ${fmt(f.t0)}–${fmt(f.t1)}</title></rect>`;
   for (const m of note.marks || []) bands += `<rect x="${X(m.t0)}" y="0" width="${Math.max(2, X(m.t1) - X(m.t0))}" height="${H}" fill="var(--ob)" opacity=".22"><title>${esc(m.text || 'mark')} ${fmt(m.t0)}–${fmt(m.t1)}</title></rect>`;
-  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="18" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" pointer-events="none"/><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0" pointer-events="none"/></svg>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="${RH}" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" pointer-events="none"/><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0" pointer-events="none"/></svg>`;
   if (ann.length) {
     el.append(h('div', { class: 'legend', style: 'margin-top:6px' }, ...ann.map((t, i) => h('span', {}, h('i', { style: 'background:' + COLORS[i % COLORS.length] }), t))));
   }
@@ -1145,7 +1150,8 @@ function drawTimeline(d, note) {
     tip.style.left = Math.min(px + 14, W - 380) + 'px'; tip.style.top = '24px';
   });
   svgEl.addEventListener('mouseleave', () => { tip.hidden = true; svgEl.querySelector('#cur').setAttribute('opacity', 0); });
-  svgEl.addEventListener('mousedown', ev => { const r = svgEl.getBoundingClientRect(); if (ev.clientY - r.top <= 18 && ev.clientX - r.left > labW) { dragFrom = tAt(ev); ev.preventDefault(); } });
+  // A mark starts anywhere in the plot area, not only on the ruler. A drag shorter than 2 s is ignored, so a plain click does nothing.
+  svgEl.addEventListener('mousedown', ev => { const r = svgEl.getBoundingClientRect(); if (ev.button === 0 && ev.clientX - r.left > labW) { dragFrom = tAt(ev); ev.preventDefault(); } });
   window.onmouseup = ev => {
     if (dragFrom === null) return;
     const t = tAt(ev), a = Math.min(dragFrom, t), b = Math.max(dragFrom, t); dragFrom = null;
