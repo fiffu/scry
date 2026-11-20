@@ -389,3 +389,5 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 
 - No gradient on the timeline: fight bands are a flat dark red (#8c1419 at 50%). The minimap stain is a flat dark red disc with a short fade at its rim (flat to 82% of the radius, then it fades out). Checked in screenshots.
 - The APM line, its dots and its legend swatch are white now (they were teal).
+
+- Movement lines fade in 25 s now (`LINE_FADE_S`), counted from when the unit arrives. They took 90 s. Icons that were destroyed and skill diamonds still take 90 s. Checked: the path of a finished move still shows 17 s after arrival, while the unit moves on (ink 4), and is gone at 40 s (ink 0).
