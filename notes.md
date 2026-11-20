@@ -339,3 +339,11 @@ Size: the map is 480 px on its longest side (was 340). `K = 1.3` scales the symb
 Checked in Chromium: label, ring, caption and banner appear at the right times and are gone at other times (ink counted around the position), the scoreboard changes with time (BYD 200/218 supply and 8.5k army at 15:00), keys behave, and the static site renders the map from a database the browser parsed.
 
 Not done or not verified: a legend entry for the labels, dark mode, a phone-sized screen, `roundRect` in older browsers (a plain rectangle is used there, untested), and the cost of the larger map on a slow machine (about 12,000 painted pixels at 15:00 on a 20-minute game, no frame problems seen in headless Chromium).
+
+## Minimap, third pass (2026-11-21)
+
+- Every icon has an outline (the theme's text colour at 70%: dark on the light theme, light on the dark theme), so icons stay readable when they pile up. Checked: the darkest pixel of a standing building is 54 against a fill of 88.
+- A destroyed icon keeps its own shape and gets an X INSIDE it: a square with an X for a building, a dot with an X for a unit. So you can tell which one died. The X is drawn in the background colour, and the whole icon fades over 90 s. Checked: the centre of a destroyed building goes from brightness 88 to 175 (the X), the total colour in its window stays high for a few seconds (32,352 against 31,965 before) and then falls to 1,049 at +100 s. A destroyed unit's centre window holds 5 background-coloured pixels (the X) and fades to 0.
+- Buildings are bigger (8 px, bases 13 px) so there is room for the X, and unit dots are 3.9 px.
+- The play and pause button keeps a fixed size (44 x 34 px). The two symbols have different widths, so it used to change size.
+- A unit's old dashed path no longer vanishes when the unit sets off again. The first version drew only the current move. Now every move that ended in the last 90 s is drawn and fades by its own age. Checked: with a unit travelling on to its next stop, the first path still shows at its midpoint (ink 4, against 0 once fully faded).
