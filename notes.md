@@ -292,3 +292,30 @@ Related finds in the same replays:
 - The "No replays found" message now says what works: choose the folder again (browser) or restart the server.
 - A remembered folder is not scanned again when the page loads, because Chrome asks for permission on a user click. Scanning on load when permission is already granted would be possible. Not built.
 - No unit tests for now. Everything tested so far was checked with throwaway scripts that are not in git.
+
+## Minimap (2026-11-21)
+
+What the replay records, and so what the map can show (checked on `Reclamation LE (2113)`):
+- Structures: every placement has x and y, and every destruction has a time. This part is complete.
+- Units: a spawn point, a death point, and "position snapshots" the game logs about every 10 s. In that game 183 of 312 army units appeared in at least one snapshot, about 3 each. So a dashed line joins two known points and is NOT the path the unit took. The legend and the canvas tooltip say so.
+- Skills: commands aimed at a point or a unit carry x and y (1,178 of 1,479 casts in the 14-replay library: nukes, scans, injects, MULEs, blinks). Self-cast skills (siege, stim, burrow) have none and never appear on the map.
+- Workers, overlords, larva and other junk are left out, so the map shows army units only. There is no terrain image: the replay holds none, only the map size.
+
+Data (parser version 13): new tables `map_units` (uid, pid, name, born, died), `map_pts` (uid, t, x, y: birth, snapshots, death) and `map_structs` (pid, name, x, y, placed, destroyed), plus `x` and `y` on `casts`. The database grew from 868 KB to 1,452 KB for 14 replays, about 42 KB per replay. Pyodide and native Python still give identical output on all 14 replays.
+
+On the page:
+- The map sits beside the timeline (stacked below it on a narrow screen, sticky while you scroll). The bounds come from the data, with one scale so the shape is not stretched, and the game's y axis (up) is flipped.
+- Playback: play and pause, a seek bar and a clock. I added a speed choice (1x to 32x, default 8x), because a 20-minute game at real time is not watchable. A moving line on the timeline (the playhead) follows the same time.
+- Symbols: squares for buildings (bigger for a base), dots for units at their last known place, dashed lines from the previous known place, diamonds for skills. All use the owner's colour. A canvas cannot read CSS variables, so the colours are computed from the same hash with `--pl` read once.
+- Fade: a symbol is brightest when new and loses brightness over 90 s of replay time (`FADE_S`). Floors: 0.18 for buildings, 0.15 for dots and 0.2 for skill diamonds, so the layout stays faintly visible. Dashed lines fade to nothing. Measured on a structure's own pixel: colour distance from the background 365, 247, 124, 68, 68 at 1, 30, 60, 100 and 300 s after placement.
+- Skills show on the map only when switched on in the Skills panel. Toggling one redraws the page, but the replay keeps its time and keeps playing. Leaving the game stops it.
+- The timeline skill pips are diamonds now (an SVG `path` with the same `pip` class, so the hover dimming is unchanged).
+
+Checked in Chromium: layout, painted pixels grow over time (398, 895, 3,481, 7,863 at 10, 120, 400 and 900 s), 8x playback advances 12 s in 1.5 s, pause holds, the playhead moves, selecting a skill changes the map and deselecting restores it exactly, 24 diamonds and no circles on the timeline, the replay survives a redraw, and a fresh game starts paused. The map also renders from a database parsed in the browser by the static site.
+
+Not built or not verified:
+- No marker where a unit dies, so fights show only as dots disappearing.
+- No toggles for workers or layers.
+- The long straight dashed lines look odd when a unit's two snapshots are far apart. They are the data, not a drawing error.
+- Dark mode, and the map on a phone-sized screen.
+- Database size at 200 replays (about 8 MB more than before, by extrapolation).

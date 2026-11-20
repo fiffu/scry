@@ -124,6 +124,15 @@ table.plain td,table.plain th{border-bottom:0}
 .bo tr.kt td{border-bottom:1px solid var(--line);padding-bottom:6px}
 .bo .sup{display:inline-block;min-width:2.4em;margin-right:6px;color:var(--mut);text-align:right;line-height:inherit}
 .pip{transition:opacity .08s}
+.tlrow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.tlrow #tl{flex:1 1 640px;min-width:0}
+.mapcol{flex:0 0 340px;position:sticky;top:72px}
+.mapcol canvas{display:block;border:1px solid var(--line);border-radius:6px;margin:0 auto}
+.mapcol .ctl{display:flex;gap:8px;align-items:center;margin-top:8px}
+.mapcol .ctl button{min-width:40px}
+.mapcol .ctl input[type=range]{flex:1;min-width:0;accent-color:var(--acc)}
+.mapcol .meta2{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--mut)}
+.mapcol .meta2 select{min-height:26px;font-size:12px}
 .mark{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
 .mu .side{display:flex;flex-direction:column;gap:4px}
@@ -220,7 +229,8 @@ function fmtDate(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.getDat
 
 /* Each player keeps one colour everywhere. The hue comes from a hash of the player id, so it never changes. */
 function hashStr(s) { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; }
-const plColor = p => `hsl(${hashStr(p.toon && !String(p.toon).startsWith('name:') ? String(p.toon) : String(p.name || '')) % 360} 62% var(--pl))`;
+const plHue = p => hashStr(p.toon && !String(p.toon).startsWith('name:') ? String(p.toon) : String(p.name || '')) % 360;
+const plColor = p => `hsl(${plHue(p)} 62% var(--pl))`;
 
 /* Short descriptions for tag tooltips. Numbers here repeat the thresholds in CFG in scry.py. */
 const TAG_INFO = {
@@ -836,7 +846,10 @@ document.addEventListener('click', e => { if (!e.target.closest('#tree,#dir,#bro
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#tree').hidden = true; });
 
 /* ---------------------------------------------------------------- game view */
-function showLib() { $('#lib').hidden = false; $('#game').hidden = true; location.hash = ''; }
+function showLib() {
+  if (current) { cancelAnimationFrame(current.raf); current.mp.playing = false; }   // the replay stops when you leave the game
+  $('#lib').hidden = false; $('#game').hidden = true; location.hash = '';
+}
 let current = null;
 function openGame(rid) {
   const g = rows('select * from replays where rid=?', [rid])[0];
@@ -849,7 +862,11 @@ function openGame(rid) {
     losses: rows('select * from fight_losses where rid=?', [rid]),
     steps: rows('select * from build_steps where rid=? order by pid, idx', [rid]),
     timings: rows('select * from timings where rid=?', [rid]),
-    casts: rows('select pid, ability, t from casts where rid=? order by t', [rid]),
+    casts: rows('select pid, ability, t, x, y from casts where rid=? order by t', [rid]),
+    munits: rows('select uid, pid, name, t0, t1 from map_units where rid=?', [rid]),
+    mpts: rows('select uid, t, x, y from map_pts where rid=?', [rid]),
+    mstructs: rows('select pid, name, x, y, t0, t1 from map_structs where rid=?', [rid]),
+    mp: { t: 0, playing: false, speed: 8, last: 0 },   // replay state. It lives here so it survives a redraw of the page
     chat: rows('select * from chat where rid=? order by t', [rid]),
     tags: rows('select tid, pid, family, tag, kind, label, evidence from tags where rid=?', [rid]),
     spans: rows('select s.tid, s.t0, s.t1 from tag_spans s join tags t using(tid) where t.rid=?', [rid]),
@@ -916,11 +933,11 @@ function renderGame() {
       h('span', {}, h('i', { style: 'background:var(--fgt)' }), 'Losses'), h('span', {}, h('i', { style: 'background:var(--ob)' }), 'Your notes'),
       h('span', {}, 'Drag anywhere on the timeline to add a note')),
     h('div', { id: 'markform', hidden: true, class: 'row', style: 'margin-bottom:8px' }),
-    h('div', { id: 'tl' })));
+    h('div', { class: 'tlrow' }, h('div', { id: 'tl' }), makeMap(d))));
 
   const two = h('div', { class: 'two' });
   // skills, grouped by race: a click shows the skill as a row of pips at the bottom of the timeline
-  const sk = h('div', { class: 'panel' }, h('h3', {}, 'Skills'), h('div', { class: 'subt' }, 'click to show on the timeline'));
+  const sk = h('div', { class: 'panel' }, h('h3', {}, 'Skills'), h('div', { class: 'subt' }, 'click to show on the timeline and the map'));
   for (const race of ['Terran', 'Protoss', 'Zerg']) {
     const pids = new Set(players.filter(pl => pl.race === race).map(pl => pl.pid));
     if (!pids.size) continue;
@@ -1010,6 +1027,7 @@ function renderGame() {
   box.append(h('div', { class: 'panel' }, h('h3', {}, 'Notes (saved in this browser)'), ta, h('div', { style: 'margin:8px 0' }, tg), h('h3', {}, 'Timeline notes'), marks));
 
   drawTimeline(d, note);
+  if (d.paintMap) { d.paintMap(); d.resumeMap(); }
 }
 let saveTimer = 0;
 function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNotes, 400); }
@@ -1105,7 +1123,8 @@ function drawTimeline(d, note) {
       for (const c of d.casts.filter(c => c.ability === ab)) {
         const pl = byPid.get(c.pid);
         if (!pl) continue;
-        svg += `<circle class="pip" data-pid="${c.pid}" data-skill="${esc(ab)}" data-name="${esc(pl.name)}" data-t="${c.t}" cx="${X(c.t).toFixed(1)}" cy="${cy}" r="4.5" fill="${plColor(pl)}" stroke="var(--panel)" stroke-width="1.2"/>`;
+        const cx = X(c.t).toFixed(1), r = 5.5;   // a diamond
+        svg += `<path class="pip" data-pid="${c.pid}" data-skill="${esc(ab)}" data-name="${esc(pl.name)}" data-t="${c.t}" d="M${cx} ${cy - r} L${(+cx + r).toFixed(1)} ${cy} L${cx} ${cy + r} L${(+cx - r).toFixed(1)} ${cy} Z" fill="${plColor(pl)}" stroke="var(--panel)" stroke-width="1.2"/>`;
       }
       y += 18;
     }
@@ -1125,12 +1144,14 @@ function drawTimeline(d, note) {
   });
   for (const f of d.fights) bands += `<rect x="${X(f.t0)}" y="${RH}" width="${Math.max(2, X(f.t1) - X(f.t0))}" height="${H - RH}" fill="var(--fgt)" opacity=".12"><title>fight ${fmt(f.t0)}–${fmt(f.t1)}</title></rect>`;
   for (const m of note.marks || []) bands += `<rect x="${X(m.t0)}" y="0" width="${Math.max(2, X(m.t1) - X(m.t0))}" height="${H}" fill="var(--ob)" opacity=".22"/>`;
-  el.innerHTML = `<svg width="${W}" height="${H + NT}" viewBox="0 0 ${W} ${H + NT}">${strip}<g transform="translate(0,${NT})">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="${RH}" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" pointer-events="none"/><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0" pointer-events="none"/></g></svg>`;
+  el.innerHTML = `<svg width="${W}" height="${H + NT}" viewBox="0 0 ${W} ${H + NT}">${strip}<g transform="translate(0,${NT})">${ruler.replace(/@H@/g, H)}${bands}${svg}<line id="cur" y1="${RH}" y2="${H}" stroke="var(--fg)" stroke-width="1" opacity="0" pointer-events="none"/><rect id="drag" y="0" height="${H}" fill="var(--ob)" opacity=".3" width="0" pointer-events="none"/><line id="playhead" x1="0" x2="0" y1="${RH}" y2="${H}" stroke="var(--acc)" stroke-width="1.5" opacity=".9" pointer-events="none"/></g></svg>`;
   if (ann.length) {
     el.append(h('div', { class: 'legend', style: 'margin-top:6px' }, ...ann.map((t, i) => h('span', {}, h('i', { style: 'background:' + COLORS[i % COLORS.length] }), t))));
   }
   const svgEl = el.querySelector('svg'), tip = h('div', { id: 'tip', hidden: true });
   el.append(tip);
+  const playhead = svgEl.querySelector('#playhead');   // the map moves it
+  d.setPlayhead = t => { const x = X(Math.min(dur, t)); playhead.setAttribute('x1', x); playhead.setAttribute('x2', x); };
   // hovering a pip dims every other player's pips, in all skill rows
   const pips = [...svgEl.querySelectorAll('.pip')];
   for (const c of pips) {
@@ -1176,8 +1197,121 @@ function drawTimeline(d, note) {
     txt.focus();
   };
 }
+/* ----------------------------------------------------------------------- minimap
+   Everything on it is a record of what the replay says, and the replay does not say everything:
+   - A structure is known from its placement to its destruction.
+   - A unit is known at its birth, at death, and at the position snapshots the game logs about every 10 s.
+     A dashed line joins two known points. It is not the path the unit took.
+   - A skill has a place only when it was aimed at a point or a unit. Self-cast skills (siege, stim) have none.
+   A symbol is brightest when it is new and fades as the replay moves on. */
+const MAP_W = 340, FADE_S = 90;
+const HALLS = new Set(['Nexus', 'CommandCenter', 'Hatchery', 'OrbitalCommand', 'PlanetaryFortress', 'Lair', 'Hive']);
+
+function buildMap(d) {
+  const units = new Map(d.munits.map(u => [u.uid, { ...u, pts: [] }]));
+  for (const q of d.mpts) { const u = units.get(q.uid); if (u) u.pts.push([q.t, q.x, q.y]); }
+  for (const u of units.values()) u.pts.sort((a, b) => a[0] - b[0]);
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  const see = (x, y) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; };
+  for (const s of d.mstructs) see(s.x, s.y);
+  for (const q of d.mpts) see(q.x, q.y);
+  for (const c of d.casts) if (c.x != null) see(c.x, c.y);
+  if (x0 === Infinity) return null;
+  x0 -= 6; y0 -= 6; x1 += 6; y1 += 6;
+  const scale = MAP_W / Math.max(x1 - x0, y1 - y0);
+  return { units: [...units.values()], structs: d.mstructs, x0, y0, scale, w: Math.round((x1 - x0) * scale), h: Math.round((y1 - y0) * scale) };
+}
+
+function makeMap(d) {
+  const col = h('div', { class: 'mapcol' });
+  if (!d.map) d.map = buildMap(d);
+  const m = d.map, mp = d.mp, dur = d.g.duration_s;
+  d.paintMap = d.resumeMap = null;
+  if (!m) { col.append(h('div', { class: 'empty', style: 'padding:12px' }, 'No map data in this replay.')); return col; }
+  const dpr = window.devicePixelRatio || 1;
+  const cv = h('canvas', { width: Math.round(m.w * dpr), height: Math.round(m.h * dpr), style: `width:${m.w}px;height:${m.h}px`,
+    title: 'Unit positions come from snapshots the game logs about every 10 seconds.' });
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  const play = h('button', { class: 'pri', title: 'Play or pause' }, mp.playing ? '❚❚' : '▶');
+  const seek = h('input', { type: 'range', min: 0, max: Math.round(dur), step: 1, value: Math.round(mp.t), title: 'Seek' });
+  const clock = h('span', { class: 'mono' });
+  const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
+  col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),
+    h('div', { class: 'subt', style: 'margin:6px 0 0' }, 'squares: buildings · dots: units · diamonds: skills · dashed: movement'));
+
+  const css = getComputedStyle(document.documentElement);     // a canvas cannot use CSS variables, so read their values here
+  const light = css.getPropertyValue('--pl').trim() || '38%', bg = css.getPropertyValue('--bg').trim() || '#e8ebee';
+  const colour = new Map(d.players.map(pl => [pl.pid, `hsl(${plHue(pl)}, 62%, ${light})`]));
+  const sx = x => (x - m.x0) * m.scale, sy = y => m.h - (y - m.y0) * m.scale;   // the game's y axis points up
+  const fade = (age, floor) => Math.max(floor, 1 - age / FADE_S);
+
+  function paint() {
+    const t = mp.t;
+    ctx.globalAlpha = 1; ctx.fillStyle = bg; ctx.fillRect(0, 0, m.w, m.h);
+    for (const s of m.structs) {                              // buildings: squares, bigger for a base
+      if (s.t0 > t || (s.t1 != null && s.t1 <= t)) continue;
+      const sz = HALLS.has(s.name) ? 9 : 5;
+      ctx.globalAlpha = fade(t - s.t0, 0.18); ctx.fillStyle = colour.get(s.pid) || '#888';
+      ctx.fillRect(sx(s.x) - sz / 2, sy(s.y) - sz / 2, sz, sz);
+    }
+    ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    const dots = [];
+    for (const u of m.units) {                                // units: a dot at the last known place, a dashed line from the one before
+      if (u.t0 > t || (u.t1 != null && u.t1 <= t)) continue;
+      const pts = u.pts; let i = -1;
+      while (i + 1 < pts.length && pts[i + 1][0] <= t) i++;
+      if (i < 0) continue;
+      const cur = pts[i], age = t - cur[0], c = colour.get(u.pid) || '#888';
+      if (i > 0) {
+        const pr = pts[i - 1];
+        if (Math.hypot(cur[1] - pr[1], cur[2] - pr[2]) > 0.5) {
+          ctx.globalAlpha = fade(age, 0) * 0.85; ctx.strokeStyle = c;
+          ctx.beginPath(); ctx.moveTo(sx(pr[1]), sy(pr[2])); ctx.lineTo(sx(cur[1]), sy(cur[2])); ctx.stroke();
+        }
+      }
+      dots.push([sx(cur[1]), sy(cur[2]), fade(age, 0.15), c]);
+    }
+    ctx.setLineDash([]);
+    for (const [x, y, a, c] of dots) { ctx.globalAlpha = a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 6.2832); ctx.fill(); }
+    const on = new Set([...d.pick.keys()].map(k => k.slice(6)));   // skills: diamonds, only for the skills switched on
+    if (on.size) {
+      for (const c of d.casts) {
+        if (c.x == null || c.t > t || !on.has(c.ability)) continue;
+        const x = sx(c.x), y = sy(c.y), r = 5;
+        ctx.globalAlpha = fade(t - c.t, 0.2); ctx.fillStyle = colour.get(c.pid) || '#888';
+        ctx.beginPath(); ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = bg; ctx.lineWidth = 1; ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    play.textContent = mp.playing ? '❚❚' : '▶';
+    seek.value = Math.round(t);
+    clock.textContent = fmt(t) + ' / ' + fmt(dur);
+    if (d.setPlayhead) d.setPlayhead(t);
+  }
+  function frame(now) {
+    if (!mp.playing) return;
+    const dt = Math.min(0.25, (now - mp.last) / 1000); mp.last = now;   // capped, so a background tab does not jump ahead
+    mp.t = Math.min(dur, mp.t + dt * mp.speed);
+    if (mp.t >= dur) mp.playing = false;
+    paint();
+    if (mp.playing) d.raf = requestAnimationFrame(frame);
+  }
+  const startLoop = () => { cancelAnimationFrame(d.raf); mp.last = performance.now(); d.raf = requestAnimationFrame(frame); };
+  play.onclick = () => {
+    if (mp.playing) { mp.playing = false; cancelAnimationFrame(d.raf); paint(); return; }
+    if (mp.t >= dur - 0.5) mp.t = 0;
+    mp.playing = true; startLoop();
+  };
+  seek.oninput = () => { mp.t = +seek.value; paint(); };
+  speed.onchange = () => { mp.speed = +speed.value; };
+  d.paintMap = paint;
+  d.resumeMap = () => { cancelAnimationFrame(d.raf); if (mp.playing) startLoop(); };   // a redraw of the page keeps the replay running
+  return col;
+}
+
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-window.addEventListener('resize', () => { if (current && !$('#game').hidden) { const note = noteFor(current.g.id, current.g.fingerprint); drawTimeline(current, note); } });
+window.addEventListener('resize', () => { if (current && !$('#game').hidden) { const note = noteFor(current.g.id, current.g.fingerprint); drawTimeline(current, note); if (current.paintMap) current.paintMap(); } });
 
 /* ------------------------------------------------------------- browser backend
    Used when the page has no server behind it (static hosting). Python runs in Web Workers (Pyodide),

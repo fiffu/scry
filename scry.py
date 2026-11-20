@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 12  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 13  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -281,6 +281,14 @@ def canonical_race(p, meta_player, start_type):
     return p.play_race
 
 
+def cmd_xy(e):
+    """Where a command was aimed, or (None, None). Self-cast commands have no location."""
+    loc = getattr(e, 'location', None)
+    if loc and len(loc) >= 2 and (loc[0] or loc[1]):
+        return round(float(loc[0]), 1), round(float(loc[1]), 1)
+    return None, None
+
+
 def parse_replay(path):
     """Parse one replay into a dict of rows. Raises on unreadable files."""
     import sc2reader
@@ -303,6 +311,7 @@ def parse_replay(path):
     stats = defaultdict(list)
     deaths, hall_deaths, structs, born, upgrades, morphs = [], [], defaultdict(list), defaultdict(list), [], []
     starts, start_type = {}, {}
+    map_structs, map_units, map_pts = {}, {}, []   # minimap: structure squares, unit dots, and where each unit was seen
     for e in r.tracker_events:
         n = type(e).__name__
         if n == 'PlayerStatsEvent':
@@ -312,13 +321,23 @@ def parse_replay(path):
             if e.frame == 0 and e.unit_type_name in TOWNHALLS:
                 starts[e.control_pid] = (e.x, e.y)
                 start_type[e.control_pid] = e.unit_type_name
+                if u:
+                    map_structs[u.id] = [e.control_pid, e.unit_type_name, e.x, e.y, 0.0, None]
             elif u and u.is_army and u.name not in JUNK_UNITS and e.unit_type_name not in NOT_ARMY and (u.minerals or u.vespene):  # u.name is the LAST type: an overlord that became an overseer reports 'Overseer'
                 born[e.control_pid].append(dict(t=e.frame / FPS, name=e.unit_type_name))
+                map_units[u.id] = [e.control_pid, e.unit_type_name, round(e.frame / FPS, 1), None]
+                map_pts.append((u.id, round(e.frame / FPS, 1), e.x, e.y))
+        elif n == 'UnitPositionsEvent':
+            # The replay lists where some units are, about every 10 s. It is the only record of units moving.
+            for unit, (x, y) in e.units.items():
+                if unit.id in map_units:
+                    map_pts.append((unit.id, round(e.frame / FPS, 1), x, y))
         elif n == 'UnitInitEvent':
             u = e.unit
             # Warp-ins fire UnitInit too, so keep only real buildings.
             if u and u.is_building and u.name not in JUNK_UNITS and not u.name.startswith('CreepTumor'):
                 structs[e.control_pid].append(dict(t=e.frame / FPS, name=e.unit_type_name, x=e.x, y=e.y))
+                map_structs[u.id] = [e.control_pid, e.unit_type_name, e.x, e.y, round(e.frame / FPS, 1), None]
         elif n == 'UnitTypeChangeEvent':
             u = e.unit
             if u and u.owner and e.unit_type_name in TECH_MORPHS:
@@ -328,6 +347,11 @@ def parse_replay(path):
                 upgrades.append((e.pid, e.frame / FPS, e.upgrade_type_name))
         elif n == 'UnitDiedEvent':
             u = e.unit
+            if u and u.id in map_structs and map_structs[u.id][5] is None:
+                map_structs[u.id][5] = round(e.frame / FPS, 1)
+            if u and u.id in map_units and map_units[u.id][3] is None:
+                map_units[u.id][3] = round(e.frame / FPS, 1)
+                map_pts.append((u.id, round(e.frame / FPS, 1), e.x, e.y))
             if not u or not u.owner:
                 continue
             # Blizzard's resources_lost ignores suicides and drones that become buildings.
@@ -359,7 +383,8 @@ def parse_replay(path):
             if ab:
                 t = e.frame / FPS
                 if is_skill(ab):
-                    cmds[e.player.pid].append((t, ab))
+                    x, y = cmd_xy(e)
+                    cmds[e.player.pid].append((t, ab, x, y))
                 elif ab.startswith(('Research', 'Evolve', 'Upgrade')) and not ab.startswith('UpgradeTo'):
                     research[e.player.pid].append((t, ab))
 
@@ -511,7 +536,7 @@ def parse_replay(path):
         for x in extras:
             tg.add(pid, 'build', x, 'rule', x.replace('-', ' '), notation)
         counts = Counter()
-        for t, ab in cmds[pid]:
+        for t, ab, _x, _y in cmds[pid]:
             counts[ab] += 1
             tg.add(pid, 'skill', ab, 'exact', ab, '', [(t, t)])
         for u in sorted({u['name'] for u in born[pid]}):
@@ -557,13 +582,16 @@ def parse_replay(path):
     add_chat_word_tags(tg, chat_rows)
 
     winner = r.winner.number if r.winner else None
-    cast_rows = [(p.pid, ab, t) for p in players for t, ab in cmds[p.pid]]
+    cast_rows = [(p.pid, ab, t, x, y) for p in players for t, ab, x, y in cmds[p.pid]]
     return dict(
         replay=dict(fingerprint=hashlib.sha1(('%s|%s' % (r.start_time.isoformat(), sorted(keys.values()))).encode()).hexdigest()[:16],
                     map=r.map_name, mode=r.type, category=r.category, build=r.build,
                     played_at=r.start_time.isoformat(), duration_s=round(dur, 1), winner_team=winner),
         players=player_rows, stats=stat_rows, casts=cast_rows, steps=step_rows, timings=timing_rows,
-        fights=fight_rows, losses=loss_rows, apm=apm_rows, chat=chat_rows, tags=tg.rows, spans=tg.spans)
+        fights=fight_rows, losses=loss_rows, apm=apm_rows, chat=chat_rows, tags=tg.rows, spans=tg.spans,
+        munits=[(uid, v[0], v[1], v[2], v[3]) for uid, v in map_units.items()],
+        mpts=sorted(map_pts, key=lambda q: (q[0], q[1])),
+        mstructs=[tuple(v) for v in map_structs.values()])
 
 
 def add_chat_word_tags(tg, chat_rows):
@@ -595,7 +623,10 @@ create table players(rid int, pid int, toon text, name text, clan text, team int
     mmr int, apm_blizzard real, apm_est real, primary key(rid, pid));
 create table tags(tid integer primary key, rid int, pid int, family text, tag text, kind text, label text, evidence text);
 create table tag_spans(tid int, t0 real, t1 real);
-create table casts(rid int, pid int, ability text, t real);
+create table casts(rid int, pid int, ability text, t real, x real, y real);
+create table map_units(rid int, uid int, pid int, name text, t0 real, t1 real);
+create table map_pts(rid int, uid int, t real, x real, y real);
+create table map_structs(rid int, pid int, name text, x real, y real, t0 real, t1 real);
 create table build_steps(rid int, pid int, idx int, t real, supply int, kind text, name text, nth int);
 create table timings(rid int, pid int, key text, t real);
 create table fights(rid int, idx int, t0 real, t1 real, x int, y int);
@@ -614,11 +645,12 @@ create index i_players on players(toon);
 '''
 # How a parsed record maps onto tables: (table, key in the record, columns after rid).
 # The browser backend reads this from manifest.json, so both writers share one layout.
-REC_TABLES = (('players', 'players', 10), ('stats', 'stats', 12), ('casts', 'casts', 3),
+REC_TABLES = (('players', 'players', 10), ('stats', 'stats', 12), ('casts', 'casts', 5),
               ('build_steps', 'steps', 7), ('timings', 'timings', 3), ('fights', 'fights', 5),
-              ('fight_losses', 'losses', 4), ('apm', 'apm', 3), ('chat', 'chat', 4))
+              ('fight_losses', 'losses', 4), ('apm', 'apm', 3), ('chat', 'chat', 4),
+              ('map_units', 'munits', 5), ('map_pts', 'mpts', 4), ('map_structs', 'mstructs', 6))
 REPLAY_FIELDS = ('map', 'mode', 'category', 'build', 'played_at', 'duration_s', 'winner_team')
-CHILD_TABLES = ('players', 'tags', 'casts', 'build_steps', 'timings', 'fights', 'fight_losses', 'stats', 'apm', 'chat')
+CHILD_TABLES = tuple(t[0] for t in REC_TABLES) + ('tags',)
 
 
 def open_db(path):
