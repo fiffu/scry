@@ -141,12 +141,17 @@ table.plain td,table.plain th{border-bottom:0}
 .mapcol .ctl input[type=range]{flex:1;min-width:0;accent-color:var(--acc)}
 .mapcol .meta2{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:6px;font-size:12px;color:var(--mut)}
 .mapcol .meta2 select{min-height:26px;font-size:12px}
-.hud{margin-top:10px;display:grid;gap:5px}
-.hud .hrow{display:grid;grid-template-columns:minmax(0,86px) 1fr auto;gap:8px;align-items:center;font-size:11.5px}
-.hud .hrow b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hud .bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden}
-.hud .bar i{display:block;height:100%;width:0}
-.hud .num{color:var(--mut);font:11px ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
+table.hud{margin-top:10px;table-layout:fixed;font-size:11.5px}
+table.hud th,table.hud td{padding:2px 6px;border-bottom:0;vertical-align:middle}
+table.hud th{font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);padding-bottom:4px}
+table.hud th:first-child,table.hud td:first-child{padding-left:0;width:100px}
+table.hud td:first-child b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.hud .r{text-align:right;width:58px;font-variant-numeric:tabular-nums}
+table.hud td.r{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+table.hud .sup{display:flex;gap:8px;align-items:center}
+table.hud .bar{flex:1;min-width:0;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+table.hud .bar i{display:block;height:100%;width:0}
+table.hud .n{flex:none;width:52px;text-align:right;color:var(--mut);font:11px ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
 .mark{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--rule)}
 .mu{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
 .mu .side{display:flex;flex-direction:column;gap:4px}
@@ -177,6 +182,13 @@ table.plain td,table.plain th{border-bottom:0}
  #game .team{padding:0}
  #game .team+.team{border-left:0;border-top:1px solid var(--rule);padding-top:8px;margin-top:6px}
  .bo{min-width:600px}
+ table.hud th:first-child,table.hud td:first-child{width:78px}
+ table.hud .r{width:52px}
+ table.hud th{font-size:9px;letter-spacing:0}
+ table.hud th:last-child,table.hud td:last-child{padding-right:0}
+ table.hud th,table.hud td{padding:2px 4px}
+ table.hud .n{width:44px}
+ table.hud .sup{gap:6px}
  .pl .nm{min-width:0}
  .card{padding:10px 12px}
  #game{padding:10px 12px 40px}
@@ -1377,12 +1389,15 @@ function makeMap(d) {
   // scoreboard: one row per player, from the stats the game logs about every 7 s
   const sorted = sortedPlayers(d.players);
   const statsOf = new Map(sorted.map(pl => [pl.pid, d.stats.filter(s => s.pid === pl.pid)]));
+  // The bar has a fixed track, and the numbers sit in boxes of a fixed width, so nothing resizes as the numbers change.
   const hudRows = sorted.map(pl => {
-    const fill = h('i'), num = h('span', { class: 'num' }), row = h('div', { class: 'hrow' },
-      h('b', { style: 'color:' + plColor(pl) }, pl.name), h('div', { class: 'bar' }, fill), num);
-    return { pl, fill, num, row, last: '' };
+    const fill = h('i'), sup = h('span', { class: 'n' }), army = h('td', { class: 'r' }), wk = h('td', { class: 'r' });
+    const row = h('tr', {}, h('td', {}, h('b', { style: 'color:' + plColor(pl) }, pl.name)), h('td', {}, h('div', { class: 'sup' }, h('div', { class: 'bar' }, fill), sup)), army, wk);
+    return { pl, fill, sup, army, wk, row, last: '' };
   });
-  const hud = h('div', { class: 'hud' }, ...hudRows.map(r => r.row));
+  const hud = h('table', { class: 'plain hud' },
+    h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Supply / Cap'), h('th', { class: 'r' }, 'Army'), h('th', { class: 'r' }, 'Worker#'))),
+    h('tbody', {}, ...hudRows.map(r => r.row)));
   const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
   col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),
     hud);
@@ -1546,8 +1561,8 @@ function makeMap(d) {
       while (lo <= hi) { const mid = (lo + hi) >> 1; if (arr[mid].t <= t) { k = mid; lo = mid + 1; } else hi = mid - 1; }
       const s = arr[k]; if (!s) continue;
       const army = s.army_value >= 1000 ? (s.army_value / 1000).toFixed(1) + 'k' : String(s.army_value);
-      const txt = s.food_used + '/' + s.food_made + ' · ' + s.workers + ' wk · army ' + army;
-      if (txt !== r.last) { r.last = txt; r.num.textContent = txt; r.fill.style.width = Math.min(100, s.food_used / 2) + '%'; r.fill.style.background = colour.get(r.pl.pid); }
+      const txt = s.food_used + '/' + s.food_made + ' ' + s.workers + ' ' + army;
+      if (txt !== r.last) { r.last = txt; r.sup.textContent = s.food_used + '/' + s.food_made; r.army.textContent = army; r.wk.textContent = s.workers; r.fill.style.width = Math.min(100, s.food_used / 2) + '%'; r.fill.style.background = colour.get(r.pl.pid); }
     }
     play.textContent = mp.playing ? '❚❚' : '▶';
     seek.value = Math.round(t);

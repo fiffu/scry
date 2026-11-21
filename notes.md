@@ -438,3 +438,5 @@ Checked in headless Chromium as a phone (390 px and 320 px wide, touch, 2x). No 
 
 - The minimap legend is gone.
 - A click on the file name chip copies the file name (not the path, which is in the tooltip) to the clipboard. The chip text shows "Copied" for about one second. On a card the click does not open the game. If the page has no clipboard API, a hidden textarea and `execCommand('copy')` are used. Checked on a card and on the game page: the clipboard holds the exact file name.
+
+- The scoreboard under the minimap is a table now, with headings "Supply / Cap" (over the bar and the supply numbers), "Army" and "Worker#". The bar has a fixed track and the numbers sit in boxes of a fixed width, so nothing resizes as the numbers change. Checked at four times (0:10, 5:00, 15:00, 21:40) at desktop width and at 360 px: the bar width, its left edge and every column width are identical. The name column is 100 px (78 px on a phone). On a phone the columns and heading text are tighter so "Worker#" fits.
