@@ -1546,7 +1546,9 @@ function makeMap(d) {
     }
     // a note of yours that covers this moment is shown across the top; at the very end, who won
     const notes_ = (noteFor(d.g.id, d.g.fingerprint).marks || []).filter(n => n.text && t >= n.t0 && t <= n.t1);
-    let caption = notes_.length ? { text: notes_[0].text, c: ob } : (d.g.winner_team && t >= dur - 4 ? { text: 'Team ' + d.g.winner_team + ' won', c: css.getPropertyValue('--win').trim() || '#6fd08a' } : null);
+    const winners = d.players.filter(q => q.team === d.g.winner_team).map(q => q.name);
+    const winnerText = (winners.length ? winners.join(winners.length > 2 ? ', ' : ' & ') : 'Team ' + d.g.winner_team) + ' won';   // names, not the team number
+    let caption = notes_.length ? { text: notes_[0].text, c: ob } : (d.g.winner_team && t >= dur - 4 ? { text: winnerText, c: css.getPropertyValue('--win').trim() || '#6fd08a' } : null);
     if (caption) {
       ctx.font = '700 11px ui-sans-serif, system-ui, sans-serif';
       let txt = caption.text; while (txt.length > 4 && ctx.measureText(txt).width > m.w - 20) txt = txt.slice(0, -2);
