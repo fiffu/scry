@@ -934,28 +934,6 @@ def bundle(out):
     print('wrote %s (%d KB)' % (out, os.path.getsize(out) // 1024))
 
 
-def build_tree(state):
-    """Folders under the root, pruned to folders that (transitively) hold replays."""
-    with state.lock:
-        con = sqlite3.connect(state.db_path)
-        paths = [r[0] for r in con.execute('select path from replays')]
-        con.close()
-    root = {'name': os.path.basename(state.root) or state.root, 'rel': '', 'n': 0, 'total': 0, 'kids': {}}
-    for p in paths:
-        parts = p.split('/')
-        node = root
-        node['total'] += 1
-        for i, part in enumerate(parts[:-1]):
-            node = node['kids'].setdefault(part, {'name': part, 'rel': '/'.join(parts[:i + 1]), 'n': 0, 'total': 0, 'kids': {}})
-            node['total'] += 1
-        node['n'] += 1
-
-    def fin(n):
-        n['kids'] = [fin(k) for k in sorted(n['kids'].values(), key=lambda k: k['name'].lower())]
-        return n
-    return fin(root)
-
-
 def make_handler(state, vdir, rescan):
     import gzip
 
@@ -988,10 +966,6 @@ def make_handler(state, vdir, rescan):
                         return self._send(200, f.read(), VENDOR_MIME[name], {'Cache-Control': 'max-age=86400'})
                 if u.path == '/db':
                     return self._db()
-                if u.path == '/api/tree':
-                    t = build_tree(state)
-                    t['abs'] = state.root
-                    return self._json(t)
                 if u.path == '/api/status':
                     return self._json({'scanning': state.scanning, 'done': state.done, 'total': state.total,
                                        'version': state.version, 'message': state.message,

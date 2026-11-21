@@ -407,3 +407,12 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - The quick fade (movement lines and destroyed icons) is 12 s now, down from 25 s (`QUICK_FADE_S`). Checked: a destroyed turret goes 13,143 (+3 s), 9,755 (+6 s), 1,386 (+14 s). A destroyed unit goes 9,200, 7,453, 0. A finished move's path shows 6 s after arrival (ink 4) and is gone at 20 s.
 
 - Skill diamonds and the nuke's blast disc fade in 30 s now (`FADE_S`), down from 90 s. The nuke's lingering blast disc has no border any more (the other area discs, such as scan and fungal, keep theirs). Checked: the nuke's effect is strong 10 s after landing (215,529) and gone at 40 s (0). The shockwave ring at the moment of landing is separate and stays.
+
+## NOT filters back; folder picker removed (2026-11-21)
+
+- NOT filters are back, in a simpler form. While Shift is held, every tag chip (facets, map chips, the pills on cards and the game page) shows a "NOT" prefix. A click then adds "NOT tag": games without that tag. Releasing Shift puts the chips back. A plain click on a NOT tag flips it to include, a second plain click removes it. Shift is read from the click event, so it also works when the key was pressed before the page had focus. A lost window focus resets it.
+- A screen with no Shift key (touch) gets a NOT button next to "clear". It stays on until tapped again. It shows only where hover is not available (`@media (hover:none)`).
+- An excluded tag has no games in the result, so the old version made it vanish from the facets and it could not be undone there. The facet list now adds back any excluded tag with a count of 0, in the NOT style. The search box also honours Shift for its suggestions.
+- On the game page, only included skills are shown on the timeline. A NOT skill is ignored there.
+- Checked against SQL on 14 games: NOT Hellion gives 13 of 14 (SQL: 13), a plain click flips to include 1 of 14 (SQL: 1), a second plain click clears it, and the active chip removes it.
+- The folder picker (the "Folders" button, the tree and `/api/tree`) is gone, along with the folder filter in every query. The root folder is still shown, read-only, in the header. Scanning still includes subfolders.

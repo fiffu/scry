@@ -9,15 +9,10 @@ html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.35 ui-sans-serif,system-ui,"Segoe UI",sans-serif}
 header{position:relative;display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
 header b{font-size:15px;margin-right:4px}
-#dir{flex:1;min-width:0;height:36px;cursor:pointer;font:13px ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
+#dir{flex:1;min-width:0;height:36px;cursor:default;font:13px ui-monospace,Menlo,Consolas,monospace;padding:0 10px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg)}
 #status,#prog{color:var(--mut);white-space:nowrap}
 #bar{width:110px;height:8px;accent-color:var(--acc)}
 #status.warn{color:var(--warn)}
-#tree{position:absolute;top:100%;left:14px;z-index:30;min-width:300px;max-width:calc(100vw - 28px);max-height:65vh;overflow:auto;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px #0004}
-.tn{display:flex;width:100%;justify-content:space-between;gap:14px;align-items:center;text-align:left;border:0;background:none;border-radius:4px;min-height:34px;font:13px ui-monospace,Menlo,Consolas,monospace}
-.tn:hover{background:color-mix(in srgb,var(--fg) 6%,transparent)}
-.tn.cur{background:color-mix(in srgb,var(--fg) 12%,transparent);font-weight:600}
-.tn small{color:var(--mut);font:11px ui-sans-serif,system-ui,sans-serif}
 button,select,input,textarea{font:inherit;color:var(--fg)}
 button{background:var(--panel);border:1px solid var(--line);border-radius:5px;min-height:34px;min-width:34px;padding:0 12px;cursor:pointer}
 button:hover{border-color:var(--acc)}
@@ -35,6 +30,13 @@ aside details.sec>summary{margin:14px 0 6px;font-size:12px;font-weight:700;lette
 .chips{display:flex;flex-wrap:wrap;gap:5px}
 .chip{display:inline-flex;gap:5px;align-items:center;min-height:26px;padding:0 8px;border-radius:13px;border:1px solid var(--line);background:var(--bg);font-size:12.5px;cursor:pointer;white-space:nowrap}
 .chip.on{background:var(--accbg);border-color:var(--acc)}
+.chip.neg{background:#3a1c1e;border-color:var(--warn);color:var(--warn)}
+.chip.neg::before,body.notmode .ftag::before{content:'NOT';font-size:9.5px;font-weight:700;letter-spacing:.04em}
+body.notmode .ftag:hover{border-color:var(--warn);color:var(--warn)}
+body.notmode .ftag.on{border-color:var(--line);background:var(--bg)}
+#notbtn{display:none}
+#notbtn.on{background:#3a1c1e;border-color:var(--warn);color:var(--warn)}
+@media (hover:none){#notbtn{display:inline-block}}
 .chip small{color:var(--mut);font-size:11px}
 .chip.flat{cursor:default}
 .chip.mine{border-color:var(--ob);background:var(--obbg)}
@@ -155,8 +157,7 @@ table.plain td,table.plain th{border-bottom:0}
 </style></head><body>
 <header>
  <b>scry</b>
- <input id="dir" readonly aria-label="Folder (click to browse)" title="Click to browse folders">
- <button id="browse" aria-label="Browse folders">Folders ▾</button>
+ <input id="dir" readonly aria-label="Folder" tabindex="-1">
  <span id="status" role="status"></span>
  <button id="choose" hidden>Choose folder…</button>
  <progress id="bar" hidden></progress>
@@ -165,7 +166,6 @@ table.plain td,table.plain th{border-bottom:0}
  <button id="imp" title="Load notes from a file">Import notes</button>
  <input id="impfile" type="file" accept="application/json,.json" hidden>
  <input id="dirinput" type="file" webkitdirectory multiple hidden>
- <div id="tree" hidden></div>
 </header>
 
 <main id="lib">
@@ -175,7 +175,8 @@ table.plain td,table.plain th{border-bottom:0}
    <input id="q" placeholder="skill, build, unit, chat text…" spellcheck="false" autocomplete="off" aria-label="Search" style="width:100%">
    <div id="sugg" hidden></div>
   </div>
-  <h4>Active filters <button id="clear" style="min-height:22px;padding:0 8px;font-size:12px">clear</button></h4>
+  <h4>Active filters <button id="clear" style="min-height:22px;padding:0 8px;font-size:12px">clear</button>
+   <button id="notbtn" style="min-height:22px;padding:0 8px;font-size:12px" title="While this is on, a tap on a tag adds NOT tag. Hold Shift to do the same with a keyboard.">NOT</button></h4>
   <div class="chips" id="active"></div>
   <details class="sec" id="playersec">
    <summary>Players</summary>
@@ -300,14 +301,22 @@ function describe(tag, label) {
 /* A tag as a pill. A click applies it as a filter. On the game page it also goes back to the library. */
 function tagPill(t, { cls = '', text = '', goBack = false } = {}) {
   const st = tagState(t.tag);
-  return h('span', { class: 'chip' + (cls ? ' ' + cls : '') + (st ? ' on' : ''),
+  return h('span', { class: 'chip ftag' + (cls ? ' ' + cls : '') + (st ? (st.not ? ' neg' : ' on') : ''),
     title: describe(t.tag, t.label) + (t.evidence ? ' (' + t.evidence + ')' : ''),
-    on: { click: e => { e.stopPropagation(); toggleInclude(t.tag); if (goBack) showLib(); } } }, text || t.label);
+    on: { click: e => { e.stopPropagation(); toggleInclude(t.tag, e.shiftKey || notMode); if (goBack) showLib(); } } }, text || t.label);
 }
-function toggleInclude(tag) {
+/* NOT mode: while Shift is held (or the NOT button is on, for a screen with no keyboard), a click on a tag
+   adds it as "NOT tag". A click on a tag that already has the same state removes it. A click in the other mode flips it. */
+let notMode = false, shiftDown = false;
+function showNotMode() { document.body.classList.toggle('notmode', notMode || shiftDown); }
+window.addEventListener('keydown', e => { if (e.key === 'Shift' && !shiftDown) { shiftDown = true; showNotMode(); } });
+window.addEventListener('keyup', e => { if (e.key === 'Shift') { shiftDown = false; showNotMode(); } });
+window.addEventListener('blur', () => { shiftDown = false; showNotMode(); });
+function toggleInclude(tag, not = false) {
   const f = tagState(tag);
-  if (f) S.tags.splice(S.tags.indexOf(f), 1);
-  else S.tags.push({ tag });
+  if (f && !!f.not === !!not) S.tags.splice(S.tags.indexOf(f), 1);
+  else if (f) f.not = !!not;
+  else S.tags.push(not ? { tag, not: true } : { tag });
   refresh();
 }
 
@@ -416,7 +425,7 @@ $('#impfile').onchange = async e => {
 
 /* ------------------------------------------------------------------- filters */
 const S = {
-  folder: '', desc: true, shown: 60,
+  desc: true, shown: 60,
   tags: [], players: new Map(), scope: true, texts: [], conds: [], ranges: {},
   mu: { a: [], b: [] },  // matchup: one list per side, one entry (null, 'P', 'T' or 'Z') per player slot
 };
@@ -482,10 +491,9 @@ function condSql(c, p) {
 function whereSql() {
   const w = [], p = [];
   if (!anyFilter()) { /* show broken replays too, so the user sees them */ } else w.push('r.error is null');
-  if (S.folder) { w.push("r.path like ? escape '\\'"); p.push(likeEsc(S.folder) + '/%'); }
   const scoped = S.scope && S.players.size;
   for (const f of S.tags) {
-    let sql = 'exists (select 1 from all_tags t where t.rid=r.rid and t.tag=?';
+    let sql = (f.not ? 'not ' : '') + 'exists (select 1 from all_tags t where t.rid=r.rid and t.tag=?';
     p.push(f.tag);
     if (scoped) { sql += ` and (t.pid is null or ${playerScope('t')})`; p.push(...S.players.keys()); }
     sql += ')';
@@ -543,7 +551,7 @@ function refresh() {
 function renderActive() {
   const box = $('#active'); box.replaceChildren();
   const x = (label, cls, fn, title) => box.append(h('span', { class: 'chip ' + cls, title: title || '', on: { click: fn } }, label, h('small', {}, '✕')));
-  S.tags.forEach((f, i) => x(f.tag, 'on', () => { S.tags.splice(i, 1); refresh(); }, 'Remove'));
+  S.tags.forEach((f, i) => x(f.not ? 'NOT ' + f.tag : f.tag, f.not ? 'neg' : 'on', () => { S.tags.splice(i, 1); refresh(); }, 'Remove'));
   for (const [toon, name] of S.players) x('player: ' + name, 'on', () => { S.players.delete(toon); refresh(); }, 'Remove');
   S.texts.forEach((t, i) => x('text: ' + t, 'on', () => { S.texts.splice(i, 1); refresh(); }, 'Remove'));
   if (muActive()) x('matchup: ' + muLabel(), 'on', () => { S.mu = { a: [], b: [] }; refresh(); }, 'Remove');
@@ -552,6 +560,7 @@ function renderActive() {
   }
   if (!box.childElementCount) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'none'));
 }
+$('#notbtn').onclick = () => { notMode = !notMode; $('#notbtn').classList.toggle('on', notMode); showNotMode(); };
 $('#clear').onclick = () => {
   S.tags = []; S.texts = []; S.players.clear(); S.conds = []; S.ranges = {}; S.mu = { a: [], b: [] };
   $('#hists').replaceChildren(); refresh();
@@ -560,10 +569,10 @@ $('#clear').onclick = () => {
 /* ---- players */
 function renderPlayers() {
   const box = $('#players'); box.replaceChildren();
-  // The list covers the whole folder, not the current result, so it does not shift while filtering.
+  // The list covers every game, not the current result, so it does not shift while filtering.
   const list = rows(`select toon, max(name) name, count(distinct rid) c from players
-    where ${S.folder ? "rid in (select rid from replays where path like ? escape '\\')" : '1'} and toon not like 'name:%'
-    group by toon order by c desc, name limit 60`, S.folder ? [likeEsc(S.folder) + '/%'] : []);
+    where toon not like 'name:%'
+    group by toon order by c desc, name limit 60`);
   const seen = new Set(list.map(r => r.toon));
   for (const [toon, name] of S.players) if (!seen.has(toon)) list.unshift({ toon, name, c: 0 });
   for (const r of list) {
@@ -591,9 +600,14 @@ function renderFacets() {
     where rid in (select rid from sel) group by family, tag, label order by c desc, label`);
   const by = {};
   for (const r of counts) (by[r.family] ||= []).push(r);
+  for (const f of S.tags) {   // a tag that is excluded has no games in the result, so it would vanish from the list and could not be undone here
+    if (!f.not || counts.some(r => r.tag === f.tag)) continue;
+    const r = rows('select family, tag, label from all_tags where tag=? limit 1', [f.tag])[0];
+    if (r) (by[r.family] ||= []).push({ ...r, c: 0 });
+  }
   const chipFor = (r, extra) => {
     const st = tagState(r.tag);
-    return h('span', { class: 'chip fc' + (st ? ' on' : '') + (extra || ''), title: describe(r.tag, r.label), on: { click: () => toggleInclude(r.tag) } },
+    return h('span', { class: 'chip ftag fc' + (st ? (st.not ? ' neg' : ' on') : '') + (extra || ''), title: describe(r.tag, r.label), on: { click: e => toggleInclude(r.tag, e.shiftKey || notMode) } },
       r.label, h('small', {}, String(r.c)));
   };
   const maps = $('#maps'); maps.replaceChildren();   // maps sit under the matchup, in a steady (alphabetical) order
@@ -631,13 +645,13 @@ function suggest() {
     if (q.length >= 3) suggItems.push({ kind: 'text', text: q });
   }
   suggSel = -1;
-  box.replaceChildren(...suggItems.map((it, i) => h('button', { class: i === suggSel ? 'sel' : '', on: { mousedown: e => { e.preventDefault(); pick(it); } } },
+  box.replaceChildren(...suggItems.map((it, i) => h('button', { class: i === suggSel ? 'sel' : '', on: { mousedown: e => { e.preventDefault(); pick(it, e.shiftKey || notMode); } } },
     it.kind === 'tag' ? h('span', {}, it.label + ' ', h('small', { style: 'color:var(--mut)' }, it.family)) : h('span', {}, 'Search chat and notes for "' + it.text + '"'),
     it.kind === 'tag' ? h('small', { style: 'color:var(--mut)' }, it.c + ' game(s)') : null)));
   box.hidden = !suggItems.length;
 }
-function pick(it) {
-  if (it.kind === 'tag') { if (!tagState(it.tag)) S.tags.push({ tag: it.tag }); }
+function pick(it, not = false) {
+  if (it.kind === 'tag') { const f = tagState(it.tag); if (f) f.not = !!not; else S.tags.push(not ? { tag: it.tag, not: true } : { tag: it.tag }); }
   else if (!S.texts.includes(it.text)) S.texts.push(it.text);
   $('#q').value = ''; $('#sugg').hidden = true; refresh();
 }
@@ -651,7 +665,7 @@ $('#q').addEventListener('keydown', e => {
     btns.forEach((b, i) => b.classList.toggle('sel', i === suggSel));
   } else if (e.key === 'Enter') {
     const it = suggItems[suggSel >= 0 ? suggSel : 0];
-    if (it) pick(it);
+    if (it) pick(it, e.shiftKey || notMode);
   } else if (e.key === 'Escape') $('#sugg').hidden = true;
 });
 
@@ -712,12 +726,10 @@ function renderConds() {
 /* ---- histogram sliders */
 function renderHists() {
   const box = $('#hists'); box.replaceChildren();
-  const scope = S.folder ? "where rid in (select rid from replays where path like ? escape '\\')" : '';
-  const sp = S.folder ? [likeEsc(S.folder) + '/%'] : [];
   for (const [key, label] of RANGE_KEYS) {
     const vals = key === 'duration'
-      ? rows(`select duration_s v from replays where error is null ${S.folder ? "and path like ? escape '\\'" : ''}`, sp).map(r => r.v)
-      : rows(`select t v from timings ${scope ? scope + ' and key=?' : 'where key=?'}`, [...sp, key]).map(r => r.v);
+      ? rows('select duration_s v from replays where error is null').map(r => r.v)
+      : rows('select t v from timings where key=?', [key]).map(r => r.v);
     if (vals.length < 2) continue;
     const lo = Math.floor(Math.min(...vals)), hi = Math.ceil(Math.max(...vals));
     if (hi <= lo) continue;
@@ -759,12 +771,12 @@ function renderHists() {
 /* ------------------------------------------------------------------- list */
 function renderList() {
   const box = $('#list');
-  const total = rows('select count(*) n from replays r ' + (S.folder ? "where r.path like ? escape '\\'" : ''), S.folder ? [likeEsc(S.folder) + '/%'] : [])[0].n;
+  const total = rows('select count(*) n from replays')[0].n;
   const n = rows('select count(*) n from sel')[0].n;
   $('#status').textContent = n + (anyFilter() ? ' of ' + total : '') + ' game(s)';
   box.replaceChildren();
-  $('#lib').classList.toggle('welcome', !total && MODE === 'browser' && !S.folder);
-  if (!total && MODE === 'browser' && !S.folder) {
+  $('#lib').classList.toggle('welcome', !total && MODE === 'browser');
+  if (!total && MODE === 'browser') {
     box.append(h('div', { class: 'panel', style: 'max-width:560px;margin:40px auto' }, h('h3', {}, 'Welcome'),
       h('p', {}, 'Choose the folder that holds your StarCraft II replays (.SC2Replay). Subfolders are included.'),
       h('p', { style: 'color:var(--mut)' }, 'Replays are read in this browser. Nothing is uploaded.'),
@@ -772,7 +784,7 @@ function renderList() {
       h('button', { class: 'pri', on: { click: chooseFolder } }, 'Choose folder…')));
     return;
   }
-  if (!total) { box.append(h('div', { class: 'empty' }, 'No replays found under ' + (S.folder || 'this folder') + '. ' + (MODE === 'browser' ? 'Choose the folder again to look for new replays.' : 'Add .SC2Replay files and restart the server.'))); return; }
+  if (!total) { box.append(h('div', { class: 'empty' }, 'No replays found in this folder. ' + (MODE === 'browser' ? 'Choose the folder again to look for new replays.' : 'Add .SC2Replay files and restart the server.'))); return; }
   if (!n) { box.append(h('div', { class: 'empty' }, 'No games match the filters.')); return; }
   const order = S.desc ? 'desc' : 'asc';
   const games = rows(`select r.rid, r.id, r.path, r.map, r.mode, r.played_at, r.duration_s, r.winner_team, r.error
@@ -825,31 +837,6 @@ function renderList() {
   if (n > games.length) box.append(h('button', { on: { click: () => { S.shown += 60; renderList(); } } }, 'Show more (' + (n - games.length) + ' left)'));
 }
 
-/* -------------------------------------------------------------- folder tree */
-async function toggleTree() {
-  const t = $('#tree');
-  if (!t.hidden) { t.hidden = true; return; }
-  const root = MODE === 'server' ? await (await fetch('/api/tree')).json() : treeFromDb();
-  S.rootAbs = root.abs;
-  t.replaceChildren();
-  const draw = (n, depth) => {
-    const b = h('button', { class: 'tn' + (n.rel === S.folder ? ' cur' : ''), on: { click: () => { t.hidden = true; setFolder(n.rel); } } },
-      h('span', {}, (depth ? '└ ' : '') + n.name + (depth ? '' : '/')), h('small', {}, n.total ? n.total + ' replay(s)' : ''));
-    b.style.paddingLeft = (10 + depth * 16) + 'px';
-    t.append(b); n.kids.forEach(k => draw(k, depth + 1));
-  };
-  draw(root, 0); t.hidden = false;
-}
-function setFolder(rel) {
-  S.folder = rel;
-  $('#dir').value = S.rootAbs ? S.rootAbs + (rel ? '/' + rel : '') : rel;
-  $('#hists').replaceChildren();
-  showLib(); refresh();
-}
-$('#dir').onclick = $('#browse').onclick = toggleTree;
-document.addEventListener('click', e => { if (!e.target.closest('#tree,#dir,#browse')) $('#tree').hidden = true; });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#tree').hidden = true; });
-
 /* ---------------------------------------------------------------- game view */
 function showLib() {
   if (current) { cancelAnimationFrame(current.raf); current.mp.playing = false; }   // the replay stops when you leave the game
@@ -875,7 +862,7 @@ function openGame(rid) {
     chat: rows('select * from chat where rid=? order by t', [rid]),
     tags: rows('select tid, pid, family, tag, kind, label, evidence from tags where rid=?', [rid]),
     spans: rows('select s.tid, s.t0, s.t1 from tag_spans s join tags t using(tid) where t.rid=?', [rid]),
-    pick: new Map(S.tags.filter(f => f.tag.startsWith('skill:')).map(f => [f.tag, true])),  // skills shown on the timeline
+    pick: new Map(S.tags.filter(f => !f.not && f.tag.startsWith('skill:')).map(f => [f.tag, true])),  // skills shown on the timeline
   };
   current = data;
   $('#lib').hidden = true; $('#game').hidden = false; $('#game').scrollTop = 0;
@@ -884,7 +871,7 @@ function openGame(rid) {
 const COLORS = ['#e07a1f', '#2a9d8f', '#d1497b', '#7a5cd1', '#c9a227', '#3b7fb5', '#6aa84f', '#c0392b'];
 function activeTagList(d) {
   const tags = [];
-  for (const f of S.tags) tags.push(f.tag);
+  for (const f of S.tags) if (!f.not) tags.push(f.tag);
   for (const t of d.pick.keys()) if (!tags.includes(t)) tags.push(t);
   return tags;
 }
@@ -1721,22 +1708,6 @@ async function scanBrowser() {
     for (const w of workers) w.terminate();  // frees the memory each Python runtime holds
     bscanning = false;
   }
-}
-
-function treeFromDb() {
-  const root = { name: (bsrc && bsrc.name) || 'replays', rel: '', n: 0, total: 0, kids: new Map() };
-  for (const { path } of rows('select path from replays')) {
-    const parts = path.split('/');
-    let node = root; node.total++;
-    parts.slice(0, -1).forEach((part, i) => {
-      if (!node.kids.has(part)) node.kids.set(part, { name: part, rel: parts.slice(0, i + 1).join('/'), n: 0, total: 0, kids: new Map() });
-      node = node.kids.get(part); node.total++;
-    });
-    node.n++;
-  }
-  const fin = n => ({ ...n, kids: [...n.kids.values()].sort((a, b) => a.name.localeCompare(b.name)).map(fin) });
-  const t = fin(root); t.abs = root.name;
-  return t;
 }
 
 /* ------------------------------------------------------------------ startup */
