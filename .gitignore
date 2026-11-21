@@ -1,8 +1,8 @@
 *.SC2Replay
-.scry/
 __pycache__/
-dist/
 _uimerge.py
 _info.txt
 shots/
 site/
+.scry/
+dist/

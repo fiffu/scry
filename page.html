@@ -392,7 +392,7 @@ function toggleInclude(tag, not = false) {
 }
 
 /* ------------------------------------------------------------------ database */
-let sqlite3, db = null, loadedVersion = -1, loadedAt = 0;
+let sqlite3, db = null;
 const rows = (sql, bind = []) => db.exec({ sql, bind, rowMode: 'object', returnValue: 'resultRows' });
 const run = (sql, bind = []) => db.exec({ sql, bind });
 
@@ -404,17 +404,6 @@ function dbFromBytes(bytes) {
   if (rc) throw new Error('sqlite3_deserialize failed: ' + rc);
   return next;
 }
-async function loadDb() {
-  const res = await fetch('/db', { cache: 'no-store' });
-  if (!res.ok) throw new Error('Could not load the database: ' + res.status);
-  const next = dbFromBytes(new Uint8Array(await res.arrayBuffer()));
-  const old = db;
-  db = next;
-  if (old) old.close();
-  setupDb();
-  loadedAt = Date.now();
-}
-
 const SYN = [
   [/Nuke/i, 'nuke nuclear ghost'], [/Stimpack/i, 'stim stimpack marine marauder'],
   [/ScannerSweep/i, 'scan scanner sweep detection'], [/MULE/i, 'mule'], [/SpawnLarva/i, 'inject queen larva'],
@@ -849,8 +838,8 @@ function renderList() {
   const n = rows('select count(*) n from sel')[0].n;
   $('#status').textContent = n + (anyFilter() ? ' of ' + total : '') + ' game(s)';
   box.replaceChildren();
-  $('#lib').classList.toggle('welcome', !total && MODE === 'browser');
-  if (!total && MODE === 'browser') {
+  $('#lib').classList.toggle('welcome', !total);
+  if (!total) {
     box.append(h('div', { class: 'panel', style: 'max-width:560px;margin:40px auto' }, h('h3', {}, 'Welcome'),
       h('p', {}, 'Choose the folder that holds your StarCraft II replays (.SC2Replay). Subfolders are included.'),
       h('p', { style: 'color:var(--mut)' }, 'Replays are read in this browser. Nothing is uploaded.'),
@@ -858,7 +847,6 @@ function renderList() {
       h('button', { class: 'pri', on: { click: chooseFolder } }, 'Choose folder…')));
     return;
   }
-  if (!total) { box.append(h('div', { class: 'empty' }, 'No replays found in this folder. ' + (MODE === 'browser' ? 'Choose the folder again to look for new replays.' : 'Add .SC2Replay files and restart the server.'))); return; }
   if (!n) { box.append(h('div', { class: 'empty' }, 'No games match the filters.')); return; }
   const order = S.desc ? 'desc' : 'asc';
   const games = rows(`select r.rid, r.id, r.path, r.map, r.mode, r.played_at, r.duration_s, r.winner_team, r.error
@@ -1618,10 +1606,10 @@ document.addEventListener('keydown', e => {
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 window.addEventListener('resize', () => { if (current && !$('#game').hidden) { const note = noteFor(current.g.id, current.g.fingerprint); drawTimeline(current, note); if (current.paintMap) current.paintMap(); } });
 
-/* ------------------------------------------------------------- browser backend
-   Used when the page has no server behind it (static hosting). Python runs in Web Workers (Pyodide),
-   parsed rows go into the in-memory database, and the database is saved in IndexedDB. */
-let MODE = 'server', manifest = null, bsrc = null, bscanning = false;
+/* ------------------------------------------------------------- parsing in the browser
+   Python runs in Web Workers (Pyodide), parsed rows go into the in-memory database, and the database is saved in IndexedDB.
+   Nothing is uploaded: the replays are read with the File System Access API (or a file input) and stay on this computer. */
+let manifest = null, bsrc = null, bscanning = false;
 
 function idb() {
   return new Promise((res, rej) => {
@@ -1857,36 +1845,10 @@ async function scanBrowser() {
 
 /* ------------------------------------------------------------------ startup */
 function toast(m, warn) { const s = $('#status'); s.textContent = m; s.classList.toggle('warn', !!warn); }
-async function poll() {
-  let st;
-  try { st = await (await fetch('/api/status', { cache: 'no-store' })).json(); } catch { return; }
-  S.rootAbs = st.root;
-  if (!$('#dir').value) $('#dir').value = st.root;
-  if (st.scanning) {
-    $('#status').classList.remove('warn');
-    $('#status').textContent = 'Scanning ' + st.done + '/' + st.total + '…';
-    if (st.version !== loadedVersion && Date.now() - loadedAt > 4000) await reload(st.version);
-  } else if (st.version !== loadedVersion) {
-    await reload(st.version);
-    if (st.errors.length) console.warn(st.errors.join('\n'));
-  }
-}
-async function reload(version) {
-  try {
-    await loadDb(); loadedVersion = version; thingOptions = null;
-    $('#hists').replaceChildren();
-    if ($('#game').hidden) refresh();  // an open game keeps showing the data it already loaded
-    deepLink();
-  } catch (e) { toast(e.message, true); console.error(e); }
-}
-
 try {
   loadNotes();
-  // A server answers /api/status. A static host does not, and the browser backend takes over.
-  const st = await fetch('/api/status', { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
   sqlite3 = await (await import('./vendor/index.mjs')).default();
-  if (st) { MODE = 'server'; await poll(); setInterval(poll, 1500); }
-  else { MODE = 'browser'; await startBrowser(); }
+  await startBrowser();
 } catch (e) {
   toast('Startup failed: ' + e.message, true); console.error(e);
 }

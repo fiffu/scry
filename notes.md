@@ -464,3 +464,12 @@ Checked in headless Chromium as a phone (390 px and 320 px wide, touch, 2x). No 
 - The supply bar track on the scoreboard is a darker grey (#4a545c, was the border colour #6b7681).
 
 - The APM points on the timeline are squares now (4.4 px, were circles of radius 2.2). Committed together with a hand edit: the APM line and points are light grey (#ddd, not white), the line is 1 px thick, and the legend entry reads "APM" (without "per 30 s"). The tooltip on a point still says the actions per minute.
+
+## Native version removed (2026-11-21)
+
+The tool runs on GitHub Pages only. Removed:
+- The Python server, the folder scan, the SQLite writer, the one-file bundle (`--bundle`), the `/api/*` and `/db` routes, `--root/--port/--open/--scan-only`. About 450 lines of `scry.py`, and the matching server mode in `page.html` (`MODE`, `poll()`, `reload()`, `loadDb()`).
+- `scry.py` is now the parser only: `parse_replay()`, the tag and build rules, `SCHEMA`, `REC_TABLES`, `REPLAY_FIELDS`, `PARSER_VERSION`. It still runs unchanged in Pyodide. Checked: the output of `parse_replay()` is identical to the old file for 5 replays, and the layout constants are equal.
+- New `build.py` writes the static site (`python build.py [OUT]`). It holds the pinned Pyodide and sqlite-wasm downloads that used to live in `scry.py`. The Dockerfile, the Makefile (`site`, `dev`, `image`, `serve`) and the Pages workflow use it.
+- `.scry/` (the old database cache) and `dist/` (the old bundle) are not used any more. They are left on disk, ignored by git, and can be deleted.
+- Testing now goes through the built site: `python build.py site`, serve `site/`, and load the replays with the folder picker. All 14 replays parse in the browser (44 players, no page errors). The history, NOT filter, scoreboard, fights table, colours, map and note drag all pass on that path.

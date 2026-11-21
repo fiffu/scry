@@ -1,4 +1,4 @@
-// Parses replays with Python (Pyodide) inside a Web Worker. Used by the static site only.
+// Parses replays with Python (Pyodide) inside a Web Worker.
 // Messages in:  { bytes: ArrayBuffer }           parse one replay
 // Messages out: { type: 'ready' } once, then { type: 'done', json } per replay,
 //               or { type: 'fatal', error } if startup fails.
@@ -10,7 +10,7 @@ let parseFile = null;
 
 async function init() {
   const py = await loadPyodide({ indexURL: new URL('./vendor/pyodide/', import.meta.url).href });
-  // sc2reader and mpyq are plain Python source. scry.py is the same file the server runs.
+  // sc2reader and mpyq are plain Python source (libs.zip). scry.py is the parser.
   const libs = await (await fetch(new URL('./libs.zip', import.meta.url))).arrayBuffer();
   py.unpackArchive(libs, 'zip', { extractDir: '/libs' });
   const src = await (await fetch(new URL('./scry.py', import.meta.url))).text();
