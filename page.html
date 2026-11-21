@@ -82,6 +82,7 @@ summary small{color:var(--mut);font-weight:400}
 .card .top span{color:var(--mut)}
 .card .right{margin-left:auto;display:flex;gap:10px;align-items:center}
 .chip.file{max-width:300px;min-height:22px;padding:0 8px;font:11.5px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+.chip.file{cursor:copy}.chip.file:hover{color:var(--fg);border-color:var(--acc)}
 .chip.file .fn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .teams{display:grid;margin:8px 0 10px}
 .team{min-width:0;padding:0 16px;display:flex;flex-direction:column;gap:3px}
@@ -263,8 +264,20 @@ const ftsq = s => '"' + s.replace(/"/g, '""') + '"';
 const RACE = { Terran: 'T', Protoss: 'P', Zerg: 'Z' };
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /* The file name as a chip. The folder path is in the tooltip. */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch { /* no clipboard API here (an http page): fall back */ }
+  const ta = h('textarea', { style: 'position:fixed;left:-1000px;top:0' }); ta.value = text; document.body.append(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch { /* not allowed */ }
+  ta.remove(); return ok;
+}
 function fileChip(path) {
-  return h('span', { class: 'chip flat file', title: path }, h('span', { class: 'fn' }, path.split('/').pop()));
+  const name = path.split('/').pop(), fn = h('span', { class: 'fn' }, name);
+  return h('span', { class: 'chip flat file', title: path + '\nClick to copy the file name', on: { click: async e => {
+    e.stopPropagation();   // on a card, a click must not open the game
+    const ok = await copyText(name);
+    fn.textContent = ok ? 'Copied' : 'Could not copy';
+    setTimeout(() => { fn.textContent = name; }, 1100);
+  } } }, fn);
 }
 function fmtDate(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
 
@@ -1372,7 +1385,6 @@ function makeMap(d) {
   const hud = h('div', { class: 'hud' }, ...hudRows.map(r => r.row));
   const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
   col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),
-    h('div', { class: 'subt', style: 'margin:6px 0 0', title: 'Between two position snapshots a unit moves in a straight line. That is an estimate.' }, '■ building   ● unit   ◆ skill   ✕ destroyed   ╌╌ movement'),
     hud);
 
   const css = getComputedStyle(document.documentElement);     // a canvas cannot use CSS variables, so read their values here
