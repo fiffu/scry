@@ -295,7 +295,30 @@ function fmtDate(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.getDat
 
 /* Each player keeps one colour everywhere. The hue comes from a hash of the player id, so it never changes. */
 function hashStr(s) { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; }
-const plHue = p => hashStr(p.toon && !String(p.toon).startsWith('name:') ? String(p.toon) : String(p.name || '')) % 360;
+/* A player's hue comes from a hash of their Battle.net id (their name, if the replay has no id), so it is the same in every game.
+   The hash knows nothing about who plays with whom, so two players of one game can get almost the same hue. adjustHues() fixes that
+   per game: it keeps the first player's hue and moves a later player in steps of 20 degrees until it is at least 40 degrees from
+   every hue already in the game. A player who does not clash keeps the hash hue. */
+const baseHue = p => hashStr(p.toon && !String(p.toon).startsWith('name:') ? String(p.toon) : String(p.name || '')) % 360;
+const hueAdj = new Map();   // "rid:pid" -> hue, for the players of games that were passed to adjustHues()
+const MIN_HUE_GAP = 40;
+const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+function adjustHues(players) {
+  const placed = [];
+  for (const p of players.slice().sort((a, b) => a.pid - b.pid)) {
+    const base = baseHue(p);
+    let pick = base, pickGap = -1;
+    for (let k = 0; k < 18; k++) {
+      const cand = (base + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 20 + 720) % 360;
+      const gap = Math.min(180, ...placed.map(q => hueGap(cand, q)));
+      if (gap >= MIN_HUE_GAP) { pick = cand; break; }
+      if (gap > pickGap) { pick = cand; pickGap = gap; }
+    }
+    hueAdj.set(p.rid + ':' + p.pid, pick);
+    placed.push(pick);
+  }
+}
+const plHue = p => hueAdj.get(p.rid + ':' + p.pid) ?? baseHue(p);
 const plColor = p => `hsl(${plHue(p)} 62% var(--pl))`;
 
 /* Short descriptions for tag tooltips. Numbers here repeat the thresholds in CFG in scry.py. */
@@ -857,6 +880,7 @@ function renderList() {
   const pls = {}, tgs = {};
   if (ids.length) {
     for (const p of rows(`select rid, pid, toon, name, team, race, result, apm_blizzard apm from players where rid in (${ph(ids.length)}) order by team, pid`, ids)) (pls[p.rid] ||= []).push(p);
+    for (const list of Object.values(pls)) adjustHues(list);
     for (const t of rows(`select rid, pid, tag, label, family, evidence from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','social')`, ids)) (tgs[t.rid] ||= []).push(t);
   }
   box.append(h('div', { class: 'row', style: 'margin-bottom:8px;color:var(--mut)' }, 'Sorted by date, ',
@@ -932,6 +956,7 @@ function openGame(rid, fromHistory = false) {
   const g = rows('select * from replays where rid=?', [rid])[0];
   if (!fromHistory) history.pushState({ game: g.id }, '', '#game=' + g.id);
   const players = rows('select * from players where rid=? order by team, pid', [rid]);
+  adjustHues(players);
   const data = {
     g, players, rid,
     stats: rows('select * from stats where rid=? order by t', [rid]),
