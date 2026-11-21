@@ -31,7 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from math import hypot
 from urllib.parse import parse_qs, urlparse
 
-PARSER_VERSION = 13  # bump when parsing or tagging changes: the database is rebuilt
+PARSER_VERSION = 14  # bump when parsing or tagging changes: the database is rebuilt
 FPS = 22.4
 EXT = '.sc2replay'
 
@@ -128,6 +128,12 @@ def player_key(p):
     if not toon:
         return 'name:' + p.name
     return '%s-%s-%s' % (getattr(p, 'region', '?'), getattr(p, 'subregion', '?'), toon)
+
+
+def slot_colour(p):
+    """The colour the replay stores for the player's slot (Red, Blue, Teal, ...), as '#rrggbb'. Empty if there is none."""
+    c = getattr(p, 'color', None)
+    return '#%02x%02x%02x' % (c.r, c.g, c.b) if c is not None else ''
 
 
 def detect_fights(deaths, dur):
@@ -433,7 +439,7 @@ def parse_replay(path):
         mmr = next((v for v in (getattr(p, 'init_data', {}).get('scaled_rating'), m.get('MMR')) if v and v > 0), None)
         apm_est[p.pid] = len(actions[p.pid]) / (dur / 60) if dur else 0
         player_rows.append((p.pid, keys[p.pid], p.name, getattr(p, 'clan_tag', '') or '', p.team.number,
-                            race_of[p.pid], p.result or '', mmr, m.get('APM'), round(apm_est[p.pid], 1)))
+                            race_of[p.pid], p.result or '', mmr, m.get('APM'), round(apm_est[p.pid], 1), slot_colour(p)))
         buckets = Counter(int(f / FPS // 30) for f in actions[p.pid])
         apm_rows += [(p.pid, b, c) for b, c in sorted(buckets.items())]
 
@@ -620,7 +626,7 @@ create table meta(key text primary key, value text);
 create table replays(rid integer primary key, id text unique, fingerprint text, path text unique, size int, mtime real,
     map text, mode text, category text, build int, played_at text, duration_s real, winner_team int, error text);
 create table players(rid int, pid int, toon text, name text, clan text, team int, race text, result text,
-    mmr int, apm_blizzard real, apm_est real, primary key(rid, pid));
+    mmr int, apm_blizzard real, apm_est real, color text, primary key(rid, pid));
 create table tags(tid integer primary key, rid int, pid int, family text, tag text, kind text, label text, evidence text);
 create table tag_spans(tid int, t0 real, t1 real);
 create table casts(rid int, pid int, ability text, t real, x real, y real);
@@ -645,7 +651,7 @@ create index i_players on players(toon);
 '''
 # How a parsed record maps onto tables: (table, key in the record, columns after rid).
 # The browser backend reads this from manifest.json, so both writers share one layout.
-REC_TABLES = (('players', 'players', 10), ('stats', 'stats', 12), ('casts', 'casts', 5),
+REC_TABLES = (('players', 'players', 11), ('stats', 'stats', 12), ('casts', 'casts', 5),
               ('build_steps', 'steps', 7), ('timings', 'timings', 3), ('fights', 'fights', 5),
               ('fight_losses', 'losses', 4), ('apm', 'apm', 3), ('chat', 'chat', 4),
               ('map_units', 'munits', 5), ('map_pts', 'mpts', 4), ('map_structs', 'mstructs', 6))

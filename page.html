@@ -3,7 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>scry</title>
 <style>
-:root{color-scheme:dark;--bg:#1a1e22;--panel:#23282d;--line:#6b7681;--rule:#394046;--fg:#e4e8eb;--mut:#9aa4ad;--acc:#52c3bd;--accbg:#1d3b3a;--warn:#ff8a73;--ob:#b794f0;--obbg:#31234b;--bar:#171b1f;--win:#6fd08a;--loss:#ff8a73;--sup:#6fb2e6;--fgt:#f08a5d;--pl:68%}
+:root{color-scheme:dark;--bg:#1a1e22;--panel:#23282d;--line:#6b7681;--rule:#394046;--fg:#e4e8eb;--mut:#9aa4ad;--acc:#52c3bd;--accbg:#1d3b3a;--warn:#ff8a73;--ob:#b794f0;--obbg:#31234b;--bar:#171b1f;--win:#6fd08a;--loss:#ff8a73;--sup:#6fb2e6;--fgt:#f08a5d}
 *{box-sizing:border-box}[hidden]{display:none!important}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;background:var(--bg);color:var(--fg);font:14px/1.35 ui-sans-serif,system-ui,"Segoe UI",sans-serif}
@@ -294,32 +294,19 @@ function fileChip(path) {
 function fmtDate(iso) { const d = new Date(iso); return isNaN(d) ? '' : d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
 
 /* Each player keeps one colour everywhere. The hue comes from a hash of the player id, so it never changes. */
-function hashStr(s) { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; }
-/* A player's hue comes from a hash of their Battle.net id (their name, if the replay has no id), so it is the same in every game.
-   The hash knows nothing about who plays with whom, so two players of one game can get almost the same hue. adjustHues() fixes that
-   per game: it keeps the first player's hue and moves a later player in steps of 20 degrees until it is at least 40 degrees from
-   every hue already in the game. A player who does not clash keeps the hash hue. */
-const baseHue = p => hashStr(p.toon && !String(p.toon).startsWith('name:') ? String(p.toon) : String(p.name || '')) % 360;
-const hueAdj = new Map();   // "rid:pid" -> hue, for the players of games that were passed to adjustHues()
-const MIN_HUE_GAP = 40;
-const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
-function adjustHues(players) {
-  const placed = [];
-  for (const p of players.slice().sort((a, b) => a.pid - b.pid)) {
-    const base = baseHue(p);
-    let pick = base, pickGap = -1;
-    for (let k = 0; k < 18; k++) {
-      const cand = (base + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 20 + 720) % 360;
-      const gap = Math.min(180, ...placed.map(q => hueGap(cand, q)));
-      if (gap >= MIN_HUE_GAP) { pick = cand; break; }
-      if (gap > pickGap) { pick = cand; pickGap = gap; }
-    }
-    hueAdj.set(p.rid + ':' + p.pid, pick);
-    placed.push(pick);
-  }
+/* The colour of a player on the game page is the colour the replay stores for that slot (Red, Blue, Teal, Purple, ...).
+   Some of them are too dark to read on a dark page (the Blue is 0,66,255), so the lightness is raised to at least 60% and the
+   hue and saturation stay. The library does not colour names, because in a 1v1 everybody is Red or Blue. */
+function plColor(p) {
+  const m = /^#([0-9a-f]{6})$/i.exec(p.color || '');
+  if (!m) return '#e4e8eb';
+  const n = parseInt(m[1], 16), r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  const s = d ? d / (1 - Math.abs(2 * l - 1)) : 0;
+  let hue = 0;
+  if (d) hue = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return `hsl(${Math.round(hue * 60)}, ${Math.round(s * 100)}%, ${Math.round(Math.max(l, 0.6) * 100)}%)`;
 }
-const plHue = p => hueAdj.get(p.rid + ':' + p.pid) ?? baseHue(p);
-const plColor = p => `hsl(${plHue(p)} 62% var(--pl))`;
 
 /* Short descriptions for tag tooltips. Numbers here repeat the thresholds in CFG in scry.py. */
 const TAG_INFO = {
@@ -666,7 +653,7 @@ function renderPlayers() {
     box.append(h('span', { class: 'chip' + (on ? ' on' : ''), title: r.toon, on: { click: () => {
       if (on) S.players.delete(r.toon); else S.players.set(r.toon, r.name);
       refresh();
-    } } }, h('span', { style: 'color:' + plColor(r) + ';font-weight:600' }, r.name), h('small', {}, String(r.c))));
+    } } }, h('span', { style: 'font-weight:600' }, r.name), h('small', {}, String(r.c))));
   }
   if (!list.length) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'no players'));
   $('#scoperow').hidden = !S.players.size;
@@ -880,7 +867,6 @@ function renderList() {
   const pls = {}, tgs = {};
   if (ids.length) {
     for (const p of rows(`select rid, pid, toon, name, team, race, result, apm_blizzard apm from players where rid in (${ph(ids.length)}) order by team, pid`, ids)) (pls[p.rid] ||= []).push(p);
-    for (const list of Object.values(pls)) adjustHues(list);
     for (const t of rows(`select rid, pid, tag, label, family, evidence from tags where rid in (${ph(ids.length)}) and family in ('build','shape','spectacle','social')`, ids)) (tgs[t.rid] ||= []).push(t);
   }
   box.append(h('div', { class: 'row', style: 'margin-bottom:8px;color:var(--mut)' }, 'Sorted by date, ',
@@ -897,7 +883,7 @@ function renderList() {
     const pill = (t, cls, text) => tagPill(t, { cls, text });
     const line = pl => h('div', { class: 'pl' },
       h('span', { class: 'race ' + (RACE[pl.race] || '') }, RACE[pl.race] || '?'),
-      h('span', { class: 'nm', style: 'color:' + plColor(pl), title: pl.name }, pl.name),
+      h('span', { class: 'nm', title: pl.name }, pl.name),
       ...tagsOf.filter(t => t.pid === pl.pid && t.family === 'build' && t.tag !== 'build:unnamed').map(t => pill(t, 'sm')));
     const byTeam = new Map();
     for (const pl of players) (byTeam.get(pl.team) || byTeam.set(pl.team, []).get(pl.team)).push(pl);
@@ -956,7 +942,6 @@ function openGame(rid, fromHistory = false) {
   const g = rows('select * from replays where rid=?', [rid])[0];
   if (!fromHistory) history.pushState({ game: g.id }, '', '#game=' + g.id);
   const players = rows('select * from players where rid=? order by team, pid', [rid]);
-  adjustHues(players);
   const data = {
     g, players, rid,
     stats: rows('select * from stats where rid=? order by t', [rid]),
@@ -1429,8 +1414,8 @@ function makeMap(d) {
     hud);
 
   const css = getComputedStyle(document.documentElement);     // a canvas cannot use CSS variables, so read their values here
-  const light = css.getPropertyValue('--pl').trim() || '68%', bg = css.getPropertyValue('--bg').trim() || '#1a1e22';
-  const colour = new Map(d.players.map(pl => [pl.pid, `hsl(${plHue(pl)}, 62%, ${light})`]));
+  const bg = css.getPropertyValue('--bg').trim() || '#1a1e22';
+  const colour = new Map(d.players.map(pl => [pl.pid, plColor(pl)]));
   const ob = css.getPropertyValue('--ob').trim() || '#6b3fa0';
   const sx = x => (x - m.x0) * m.scale, sy = y => m.h - (y - m.y0) * m.scale;   // the game's y axis points up
   const quick = age => Math.max(0, 1 - age / QUICK_FADE_S);   // movement lines and destroyed icons fade fast
