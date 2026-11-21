@@ -1034,13 +1034,14 @@ function renderGame() {
   // fights
   const ft = h('div', { class: 'panel' }, h('h3', {}, 'Fights'));
   if (d.fights.length) {
-    const tb = h('table', {}, h('tr', {}, ...['When', 'Where', 'Lost value (team: main losses)'].map(x => h('th', {}, x))));
+    const tb = h('table', {}, h('tr', {}, ...['When', 'Where', 'Value lost', 'Notable losses'].map(x => h('th', { style: 'white-space:nowrap' }, x))));
     for (const f of d.fights) {
       const ls = d.losses.filter(l => l.fight_idx === f.idx);
       tb.append(h('tr', {}, h('td', { class: 'mono' }, fmt(f.t0) + '–' + fmt(f.t1)), h('td', { class: 'mono' }, f.x + ',' + f.y),
-        h('td', {}, ...ls.map(l => h('div', {}, 'T' + l.team + ' ' + l.value + (l.top_units ? ': ' + l.top_units : ''))))));
+        h('td', { style: 'white-space:nowrap' }, ...ls.map(l => h('div', {}, 'T' + l.team + ' ' + l.value))),   // one line per team in both cells, so they line up
+        h('td', { style: 'white-space:nowrap' }, ...ls.map(l => h('div', l.top_units ? {} : { style: 'color:var(--mut)' }, l.top_units || '—')))));
     }
-    ft.append(tb);
+    ft.append(h('div', { style: 'overflow-x:auto' }, tb));   // each team stays on one line, so the two columns line up. A long line scrolls sideways
   } else ft.append(h('div', { class: 'empty' }, 'No fights detected.'));
   two.append(ft);
   box.append(two);
