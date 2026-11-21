@@ -34,7 +34,9 @@ aside details.sec>summary{margin:14px 0 6px;font-size:12px;font-weight:700;lette
 .chip.neg::before,body.notmode .ftag::before{content:'NOT';font-size:9.5px;font-weight:700;letter-spacing:.04em}
 body.notmode .ftag:hover{border-color:var(--warn);color:var(--warn)}
 body.notmode .ftag.on{border-color:var(--line);background:var(--bg)}
-#notbtn{display:none}
+#notbtn,#filtbtn{display:none}
+.when{white-space:nowrap}
+#tl{overflow-x:auto}
 #notbtn.on{background:#3a1c1e;border-color:var(--warn);color:var(--warn)}
 @media (hover:none){#notbtn{display:inline-block}}
 .chip small{color:var(--mut);font-size:11px}
@@ -97,7 +99,7 @@ summary small{color:var(--mut);font-weight:400}
 .sub{color:var(--mut);margin-bottom:12px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
 .panel h3{margin:0 0 8px;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
-.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:12px}
 #tl{width:100%;overflow:hidden;position:relative}
 #tl svg{display:block;user-select:none}
 #tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:12px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre;box-shadow:0 4px 14px #0004;z-index:5}
@@ -153,7 +155,35 @@ table.plain td,table.plain th{border-bottom:0}
 .mu button.Z{background:color-mix(in srgb,#9a46b8 16%,var(--panel));border-color:color-mix(in srgb,#9a46b8 38%,var(--line))}
 .mu button:hover{opacity:.78}
 #lib.welcome{grid-template-columns:1fr}#lib.welcome aside{display:none}
-@media (max-width:900px){#lib{grid-template-columns:1fr;grid-auto-rows:auto;overflow-y:auto}aside{border-right:0;border-bottom:1px solid var(--line);max-height:60vh}}
+@media (max-width:900px){
+ #lib{display:block;overflow-y:auto}
+ aside{display:none;border-right:0;border-bottom:1px solid var(--line);max-height:none;overflow:visible}
+ body.filters-open aside{display:block}
+ #filtbtn{display:inline-block}
+ #filtbtn.on{background:var(--accbg);border-color:var(--acc)}
+ header{flex-wrap:wrap;gap:8px;padding:8px 12px}
+ header button{white-space:nowrap;padding:0 10px;min-height:32px}
+ #dir{display:none}
+ .long{display:none}
+ #status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+ .card .right{margin-left:0;flex-basis:100%;min-width:0;justify-content:space-between}
+ .card .right .chip.file{min-width:0;flex:0 1 auto}
+ #game .teams{grid-template-columns:minmax(0,1fr)!important}
+ #game .team{padding:0}
+ #game .team+.team{border-left:0;border-top:1px solid var(--rule);padding-top:8px;margin-top:6px}
+ .bo{min-width:600px}
+ .pl .nm{min-width:0}
+ .card{padding:10px 12px}
+ #game{padding:10px 12px 40px}
+ .gamebar{position:static;margin:0 0 12px;padding:0;border:0}
+ .gamebar .meta{margin-left:0;flex-basis:100%;flex-wrap:wrap}
+ .gamebar h2{font-size:19px}
+ .panel{padding:10px 12px}
+ .tlrow{flex-direction:column;flex-wrap:nowrap}
+ .tlrow #tl{flex:0 0 auto;width:100%}
+ .mapcol{flex:0 0 auto;width:100%;position:static}
+ .mapcol canvas{max-width:100%;height:auto!important}
+}
 </style></head><body>
 <header>
  <b>scry</b>
@@ -162,8 +192,9 @@ table.plain td,table.plain th{border-bottom:0}
  <button id="choose" hidden>Choose folder…</button>
  <progress id="bar" hidden></progress>
  <span id="prog"></span>
- <button id="exp" title="Download your notes as a file">Export notes</button>
- <button id="imp" title="Load notes from a file">Import notes</button>
+ <button id="filtbtn" title="Show or hide the filters">Filters</button>
+ <button id="exp" title="Download your notes as a file">Export<span class="long"> notes</span></button>
+ <button id="imp" title="Load notes from a file">Import<span class="long"> notes</span></button>
  <input id="impfile" type="file" accept="application/json,.json" hidden>
  <input id="dirinput" type="file" webkitdirectory multiple hidden>
 </header>
@@ -176,7 +207,7 @@ table.plain td,table.plain th{border-bottom:0}
    <div id="sugg" hidden></div>
   </div>
   <h4>Active filters <button id="clear" style="min-height:22px;padding:0 8px;font-size:12px">clear</button>
-   <button id="notbtn" style="min-height:22px;padding:0 8px;font-size:12px" title="While this is on, a tap on a tag adds NOT tag. Hold Shift to do the same with a keyboard.">NOT</button></h4>
+   <button id="notbtn" style="min-height:22px;padding:0 8px;font-size:12px" title="Tap this, then tap a tag to add NOT tag. Hold Shift to do the same with a keyboard.">NOT</button></h4>
   <div class="chips" id="active"></div>
   <details class="sec" id="playersec">
    <summary>Players</summary>
@@ -313,6 +344,7 @@ window.addEventListener('keydown', e => { if (e.key === 'Shift' && !shiftDown) {
 window.addEventListener('keyup', e => { if (e.key === 'Shift') { shiftDown = false; showNotMode(); } });
 window.addEventListener('blur', () => { shiftDown = false; showNotMode(); });
 function toggleInclude(tag, not = false) {
+  if (notMode) { notMode = false; $('#notbtn').classList.remove('on'); showNotMode(); }   // the button applies to one tap
   const f = tagState(tag);
   if (f && !!f.not === !!not) S.tags.splice(S.tags.indexOf(f), 1);
   else if (f) f.not = !!not;
@@ -558,8 +590,10 @@ function renderActive() {
   for (const [k, [lo, hi]] of Object.entries(S.ranges)) {
     x((k === 'duration' ? 'length' : k) + ' ' + fmt(lo) + '–' + fmt(hi), 'on', () => { delete S.ranges[k]; $('#hists').replaceChildren(); refresh(); }, 'Remove');
   }
+  $('#filtbtn').textContent = 'Filters' + (box.childElementCount ? ' (' + box.childElementCount + ')' : '');
   if (!box.childElementCount) box.append(h('span', { class: 'empty', style: 'padding:0;font-size:12.5px' }, 'none'));
 }
+$('#filtbtn').onclick = () => { const on = document.body.classList.toggle('filters-open'); $('#filtbtn').classList.toggle('on', on); };
 $('#notbtn').onclick = () => { notMode = !notMode; $('#notbtn').classList.toggle('on', notMode); showNotMode(); };
 $('#clear').onclick = () => {
   S.tags = []; S.texts = []; S.players.clear(); S.conds = []; S.ranges = {}; S.mu = { a: [], b: [] };
@@ -651,6 +685,7 @@ function suggest() {
   box.hidden = !suggItems.length;
 }
 function pick(it, not = false) {
+  if (notMode) { notMode = false; $('#notbtn').classList.remove('on'); showNotMode(); }
   if (it.kind === 'tag') { const f = tagState(it.tag); if (f) f.not = !!not; else S.tags.push(not ? { tag: it.tag, not: true } : { tag: it.tag }); }
   else if (!S.texts.includes(it.text)) S.texts.push(it.text);
   $('#q').value = ''; $('#sugg').hidden = true; refresh();

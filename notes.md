@@ -416,3 +416,13 @@ Ideas not built: more area skills (psionic storm, fungal, EMP: their radii are o
 - On the game page, only included skills are shown on the timeline. A NOT skill is ignored there.
 - Checked against SQL on 14 games: NOT Hellion gives 13 of 14 (SQL: 13), a plain click flips to include 1 of 14 (SQL: 1), a second plain click clears it, and the active chip removes it.
 - The folder picker (the "Folders" button, the tree and `/api/tree`) is gone, along with the folder filter in every query. The root folder is still shown, read-only, in the header. Scanning still includes subfolders.
+
+## Phone layout (2026-11-21)
+
+Checked in headless Chromium as a phone (390 px and 320 px wide, touch, 2x). No horizontal page scroll at either width. Rules are in the `@media (max-width:900px)` block of `page.html`.
+- The filters are behind a "Filters (n)" button in the header (n is the number of active filters). The sidebar was always open and took 60% of the screen with its own scroll. It now stacks above the list as plain blocks when open. This also fixed the sidebar and list overlapping when the sidebar was open.
+- The header wraps. The root folder box is hidden (it shrank to an empty square). The buttons read "Export" and "Import" instead of "Export notes" and "Import notes". The full words are in their tooltips.
+- A card's file name and date sit on their own row and no longer overflow the card.
+- Game page: the sticky bar is no longer sticky (it covered about a quarter of the screen). The teams stack, one under the other. The timeline scrolls sideways inside its panel (its plot needs about 640 px). The map is under the timeline at the full width, with the canvas scaled down by CSS. The build-order table has a minimum width of 600 px and scrolls sideways inside its box.
+- The NOT button (touch only) is one-shot: it switches off after one tap on a tag, so the cards do not stay in NOT mode.
+- Known roughness: at 320 px the header takes two rows. A long player name can wrap under its race badge. The timeline needs a sideways scroll to see past about the sixth minute. I did not try a long press, pinch zoom or landscape.
