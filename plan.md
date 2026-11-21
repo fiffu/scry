@@ -1,5 +1,7 @@
 # Scry: plan
 
+> Historical: this was the first plan. The tool is built and runs on GitHub Pages only. [DESIGN.md](DESIGN.md) says how it works now, and the server, `scan` and one-file build described below no longer exist.
+
 Scry reads StarCraft II replays from a folder. It builds a searchable library and shows a timeline for each game.
 The goal is to help a viewer find games worth cutting into a highlights reel.
 The tool specializes in filtering. Each viewer has their own idea of a highlight.

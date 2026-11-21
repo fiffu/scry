@@ -473,3 +473,5 @@ The tool runs on GitHub Pages only. Removed:
 - New `build.py` writes the static site (`python build.py [OUT]`). It holds the pinned Pyodide and sqlite-wasm downloads that used to live in `scry.py`. The Dockerfile, the Makefile (`site`, `dev`, `image`, `serve`) and the Pages workflow use it.
 - `.scry/` (the old database cache) and `dist/` (the old bundle) are not used any more. They are left on disk, ignored by git, and can be deleted.
 - Testing now goes through the built site: `python build.py site`, serve `site/`, and load the replays with the folder picker. All 14 replays parse in the browser (44 players, no page errors). The history, NOT filter, scoreboard, fights table, colours, map and note drag all pass on that path.
+
+- `DESIGN.md` now describes the tool as it is (architecture, files, parser facts, data model, tags, build orders, both pages, the minimap, notes and history, phone layout, testing, known limits). `README.md` is a short description. `plan.md` carries a note that it is historical. `notes.md` stays as the dated log.
