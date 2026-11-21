@@ -462,3 +462,5 @@ Checked in headless Chromium as a phone (390 px and 320 px wide, touch, 2x). No 
 - Not checked: a replay whose players changed their colour in the lobby. I do not know whether the replay stores the chosen colour or the slot colour then. All 14 replays here have the slot colours.
 
 - The supply bar track on the scoreboard is a darker grey (#4a545c, was the border colour #6b7681).
+
+- The APM points on the timeline are squares now (4.4 px, were circles of radius 2.2). Committed together with a hand edit: the APM line and points are light grey (#ddd, not white), the line is 1 px thick, and the legend entry reads "APM" (without "per 30 s"). The tooltip on a point still says the actions per minute.

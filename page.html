@@ -1017,7 +1017,7 @@ function renderGame() {
   }
 
   box.append(h('div', { class: 'panel' }, h('h3', {}, 'Timeline'),
-    h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:#fff' }), 'APM (per 30 s)'), h('span', {}, h('i', { style: 'background:var(--sup)' }), 'Supply'),
+    h('div', { class: 'legend' }, h('span', {}, h('i', { style: 'background:#ddd' }), 'APM'), h('span', {}, h('i', { style: 'background:var(--sup)' }), 'Supply'),
       h('span', {}, h('i', { style: 'background:var(--fgt)' }), 'Losses'), h('span', {}, h('i', { style: 'background:var(--ob)' }), 'Your notes'),
       h('span', { class: 'mouseonly' }, 'Drag anywhere on the timeline to add a note')),
     h('div', { class: 'row touchonly', style: 'margin:0 0 8px;gap:10px' }, h('button', { id: 'addnote' }, 'Add note'), h('span', { id: 'tlhint' })),
@@ -1179,8 +1179,8 @@ function drawTimeline(d, note) {
       const n = mine.get(b) || 0;
       pts.push([X(Math.min(dur, b * 30 + 15)), y + laneH - 2 - (n / maxApm) * (laneH - 4), n, b]);
     }
-    svg += `<polyline points="${pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>`;
-    for (const q of pts) svg += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="2.2" fill="#fff"><title>${q[2] * 2} actions per minute at ${fmt(q[3] * 30)}</title></circle>`;
+    svg += `<polyline points="${pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="#ddd" stroke-width="1.0" stroke-linejoin="round"/>`;
+    for (const q of pts) svg += `<rect x="${(q[0] - 2.2).toFixed(1)}" y="${(q[1] - 2.2).toFixed(1)}" width="4.4" height="4.4" fill="#ddd"><title>${q[2] * 2} actions per minute at ${fmt(q[3] * 30)}</title></rect>`;
     svg += lbl(y, 'APM');
     y += laneH + gap;
     const st = d.stats.filter(s => s.pid === p.pid);
