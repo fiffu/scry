@@ -149,7 +149,7 @@ table.hud td:first-child b{display:block;overflow:hidden;text-overflow:ellipsis;
 table.hud .r{text-align:right;width:58px;font-variant-numeric:tabular-nums}
 table.hud td.r{font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
 table.hud .sup{display:flex;gap:8px;align-items:center}
-table.hud .bar{flex:1;min-width:0;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+table.hud .bar{flex:1;min-width:0;height:5px;border-radius:3px;background:#4a545c;overflow:hidden}
 table.hud .bar i{display:block;height:100%;width:0}
 table.hud .n{flex:none;width:52px;text-align:right;color:var(--mut);font:11px ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
 .mark{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--rule)}
@@ -1407,7 +1407,7 @@ function makeMap(d) {
     return { pl, fill, sup, army, wk, row, last: '' };
   });
   const hud = h('table', { class: 'plain hud' },
-    h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Supply / Cap'), h('th', { class: 'r' }, 'Army'), h('th', { class: 'r' }, 'Worker#'))),
+    h('thead', {}, h('tr', {}, h('th', {}), h('th', {}, 'Supply / Cap'), h('th', { class: 'r' }, 'Army'), h('th', { class: 'r' }, 'Workers'))),
     h('tbody', {}, ...hudRows.map(r => r.row)));
   const speed = h('select', { title: 'Replay speed' }, ...[1, 2, 4, 8, 16, 32].map(v => h('option', { value: v, selected: v === mp.speed }, v + '×')));
   col.append(cv, h('div', { class: 'ctl' }, play, seek), h('div', { class: 'meta2' }, clock, speed),

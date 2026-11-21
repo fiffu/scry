@@ -460,3 +460,5 @@ Checked in headless Chromium as a phone (390 px and 320 px wide, touch, 2x). No 
 - The game page uses the replay colour for names, the timeline, the minimap icons and the scoreboard. `plColor()` raises the lightness to at least 60% and keeps the hue and saturation, because the stored Blue (0,66,255) and Purple (84,0,129) are too dark to read on the dark page. So the game page shows Red as (235,71,82), Blue as (51,105,255), Purple as (184,51,255) and Teal as (68,181,238).
 - The hash colour, `adjustHues()` and the `--pl` variable are removed.
 - Not checked: a replay whose players changed their colour in the lobby. I do not know whether the replay stores the chosen colour or the slot colour then. All 14 replays here have the slot colours.
+
+- The supply bar track on the scoreboard is a darker grey (#4a545c, was the border colour #6b7681).
